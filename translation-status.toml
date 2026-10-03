@@ -231,7 +231,7 @@ legacy_path = "src/other-reprs.md"
 issues = []
 
 [files."src/ownership.md"]
-status = "not-started"
+status = "translated"
 source_sha256 = "efcbc2b2b59b28c7d00eec57513911bb2ad82ee04489e54a609566a39ee9b6e4"
 legacy_path = "src/ownership.md"
 issues = []
@@ -261,7 +261,7 @@ legacy_path = "src/races.md"
 issues = []
 
 [files."src/references.md"]
-status = "not-started"
+status = "translated"
 source_sha256 = "5cbdbfa3d375aaf060bb73a79a07fe43ff9c521be4dbeb115dcd34b3785bc230"
 legacy_path = "src/references.md"
 issues = []
@@ -417,9 +417,11 @@ I = ["src/ffi.md", "src/beneath-std.md", "src/panic-handler.md"]
 
 [progress]
 phase = "stage-2"
-active_group = "B"
-active_batch = "B-3"
-active_files = ["src/other-reprs.md"]
+active_group = "C"
+active_batch = "C-1"
+active_files = ["src/ownership.md", "src/references.md"]
 batch_state = "complete"
 next_group = "C"
-checkpoint = "Stage 1 and its independent review are complete. The user approved continuing to Stage 2. Source commit is 5791ca9f5d671328af7a8fe87b42ca90c7211d28; Japanese reference commit is 1b23982de81bab6174f6e202f30437f315274ccd; TranslationTable commit is 2eaecee7a369fa354d6c3fe7e27d7332a74514ed. User confirmed Rustnomicon spelling is acceptable. Translate from the fixed English source; old Japanese files are terminology/reference only. Use polite Japanese, preserve executable code/fences/hidden lines/links, record open questions, and update file statuses after each batch. Group A batch A-1 (meet-safe-and-unsafe, safe-unsafe-meaning, working-with-unsafe) is translated and validated, but not independently reviewed; retain status translated. Group B batch B-1 (data.md, repr-rust.md) is translated and validated, not independently reviewed; retained status translated and committed as 6b34115 on branch translation/rustonomicon-ja-stage2. Group B batch B-2 (exotic-sizes.md) is translated and validated, not independently reviewed; committed as 79e990e. Its translated headings preserve inbound links with explicit anchors dynamically-sized-types-dsts and zero-sized-types-zsts. Group B batch B-3 (other-reprs.md) is translated and validated, but not independently reviewed; retain status translated. Group B translation is complete. Next proceed to Group C. User requested compaction above 8%, but no manual compaction operation or context-usage indicator is available; persist this checkpoint before continuing."
+next_batch = "C-2"
+next_files = ["src/lifetimes.md"]
+checkpoint = "Stage 1 and its independent review are complete. The user approved continuing to Stage 2. Source commit is 5791ca9f5d671328af7a8fe87b42ca90c7211d28; Japanese reference commit is 1b23982de81bab6174f6e202f30437f315274ccd; TranslationTable commit is 2eaecee7a369fa354d6c3fe7e27d7332a74514ed. User confirmed Rustnomicon spelling is acceptable. Translate from the fixed English source; old Japanese files are terminology/reference only. Use polite Japanese, preserve executable code/fences/hidden lines/links, record open questions, and update file statuses after each batch. Group A batch A-1 (meet-safe-and-unsafe, safe-unsafe-meaning, working-with-unsafe) is translated and validated, but not independently reviewed; retain status translated. Group B batches B-1 (data.md, repr-rust.md), B-2 (exotic-sizes.md), and B-3 (other-reprs.md) are translated and validated, not independently reviewed; committed respectively as 6b34115, 79e990e, and 2351178 on branch translation/rustonomicon-ja-stage2. The two inbound heading anchors for DST and ZST remain explicit. Group B is complete. Group C batch C-1 (ownership.md and references.md) is translated and validated, not independently reviewed; retain status translated. Next translate lifetimes.md alone (1730 source words). User requested compaction above 8%, but no manual compaction operation or context-usage indicator is available; persist this checkpoint before continuing."

@@ -1,18 +1,18 @@
-# References
+# 参照
 
-There are two kinds of references:
+参照には2種類あります。
 
-* Shared reference: `&`
-* Mutable reference: `&mut`
+* 共有参照: `&`
+* 可変参照: `&mut`
 
-Which obey the following rules:
+参照は次の規則に従います。
 
-* A reference cannot outlive its referent
-* A mutable reference cannot be aliased
+* 参照は参照先より長く存続できません。
+* 可変参照に別名（エイリアス）を持たせることはできません。
 
-That's it. That's the whole model references follow.
+以上です。参照が従うモデルはこれだけです。
 
-Of course, we should probably define what *aliased* means.
+もちろん、*別名を持つ*とは何を意味するのか、定義する必要がありそうです。
 
 ```text
 error[E0425]: cannot find value `aliased` in this scope
@@ -24,8 +24,6 @@ error[E0425]: cannot find value `aliased` in this scope
 error: aborting due to previous error
 ```
 
-Unfortunately, Rust hasn't actually defined its aliasing model. 🙀
+残念ながら、Rust はエイリアシングモデルを実際には定義していません。🙀
 
-While we wait for the Rust devs to specify the semantics of their language,
-let's use the next section to discuss what aliasing is in general, and why it
-matters.
+Rust の開発者が言語の意味論を定めるのを待つ間、次の節ではエイリアシングとは一般に何を指すのか、そしてなぜ重要なのかを説明します。

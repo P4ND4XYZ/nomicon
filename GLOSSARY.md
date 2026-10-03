@@ -32,6 +32,7 @@
 | uninitialized memory | 未初期化メモリ | 初期化済みの値と区別します。 |
 | initialized | 初期化済み | `initialized elements` は「初期化済みの要素」。 |
 | dangling | ダングリング | ポインタ・参照の性質を指します。 |
+| use-after-free | 解放後使用 | 解放済みメモリを使用するバグです。 |
 | unaligned | アラインメントを満たさない | ポインタが必要なアラインメントを満たさない場合に用います。 |
 | data race | データ競合 | `race condition` と区別します。 |
 | race condition | 競合状態 | データ競合と同一視しません。 |
@@ -62,6 +63,11 @@
 | cache line | キャッシュライン | キャッシュが一度に扱うメモリ領域です。 |
 | public ABI | 公開 ABI | 他クレートとの互換性に関わる型の ABI です。 |
 | natural alignment | 自然なアラインメント | 型が通常要求するアラインメントです。 |
+| garbage collection (GC) | ガーベジコレクション（GC） | メモリ管理方式です。 |
+| escape analysis | エスケープ解析 | 値・参照がスコープ外へ逃れるかを解析します。 |
+| referent | 参照先 | 参照が指す対象です。 |
+| freeze | 凍結する | 参照が参照先などへの変更を制限する文脈で用います。 |
+| alias | 別名／エイリアス | `aliasing`「エイリアシング」と区別して、参照の別名を指します。 |
 | vector / Vec | ベクタ / `Vec` | 一般名は「ベクタ」、Rust の型名は `Vec` のままです。 |
 
 ## 表記上の注意
