@@ -207,7 +207,7 @@ legacy_path = "src/lifetime-mismatch.md"
 issues = []
 
 [files."src/lifetimes.md"]
-status = "not-started"
+status = "translated"
 source_sha256 = "740310c7687ccf9f1c8179cf9712420c5edd278a4839309adbe52052a2d02d35"
 legacy_path = "src/lifetimes.md"
 issues = []
@@ -418,10 +418,12 @@ I = ["src/ffi.md", "src/beneath-std.md", "src/panic-handler.md"]
 [progress]
 phase = "stage-2"
 active_group = "C"
-active_batch = "C-1"
-active_files = ["src/ownership.md", "src/references.md"]
+active_batch = "C-2"
+active_files = ["src/lifetimes.md"]
 batch_state = "complete"
+paused = true
+pause_reason = "user-request"
 next_group = "C"
-next_batch = "C-2"
-next_files = ["src/lifetimes.md"]
-checkpoint = "Stage 1 and its independent review are complete. The user approved continuing to Stage 2. Source commit is 5791ca9f5d671328af7a8fe87b42ca90c7211d28; Japanese reference commit is 1b23982de81bab6174f6e202f30437f315274ccd; TranslationTable commit is 2eaecee7a369fa354d6c3fe7e27d7332a74514ed. User confirmed Rustnomicon spelling is acceptable. Translate from the fixed English source; old Japanese files are terminology/reference only. Use polite Japanese, preserve executable code/fences/hidden lines/links, record open questions, and update file statuses after each batch. Group A batch A-1 (meet-safe-and-unsafe, safe-unsafe-meaning, working-with-unsafe) is translated and validated, but not independently reviewed; retain status translated. Group B batches B-1 (data.md, repr-rust.md), B-2 (exotic-sizes.md), and B-3 (other-reprs.md) are translated and validated, not independently reviewed; committed respectively as 6b34115, 79e990e, and 2351178 on branch translation/rustonomicon-ja-stage2. The two inbound heading anchors for DST and ZST remain explicit. Group B is complete. Group C batch C-1 (ownership.md and references.md) is translated and validated, not independently reviewed; retain status translated. Next translate lifetimes.md alone (1730 source words). User requested compaction above 8%, but no manual compaction operation or context-usage indicator is available; persist this checkpoint before continuing."
+next_batch = "C-3"
+next_files = ["src/lifetime-mismatch.md", "src/lifetime-elision.md", "src/unbounded-lifetimes.md"]
+checkpoint = "The user explicitly instructed continuous work through completion, stopping only to report a problem; do not wait for per-batch approval. Source commit 5791ca9f5d671328af7a8fe87b42ca90c7211d28, legacy reference 1b23982de81bab6174f6e202f30437f315274ccd, and translation-table commit 2eaecee7a369fa354d6c3fe7e27d7332a74514ed are fixed. The user confirmed Rustnomicon spelling. Translate current English source, using old Japanese only as a checked reference. Polite Japanese; preserve code, fences, hidden lines, links and claims. Record issues, update glossary/status, verify each batch, report each batch, and commit at coherent checkpoints on translation/rustonomicon-ja-stage2 (already created). Group A complete: A-1 translated three remaining chapters; four A/initial trial files have contrast-reviewed status. Group B complete and committed: B-1 data.md/repr-rust.md commit 6b34115; B-2 exotic-sizes.md commit 79e990e; B-3 other-reprs.md commit 2351178. B-2 preserves inbound DST/ZST anchors. Group C batch C-1 ownership.md/references.md committed as f4813f4; translated and validated, not independently reviewed. Batch C-2 (lifetimes.md) is translated and validated, not independently reviewed; retain status translated. Next intended batch C-3 is lifetime-mismatch.md, lifetime-elision.md and unbounded-lifetimes.md. The user requested pausing at this coherent checkpoint; do not begin C-3 until they resume. Progress is persisted here; manual compaction/context-usage tools are unavailable, so rely on this checkpoint if the session compacts."

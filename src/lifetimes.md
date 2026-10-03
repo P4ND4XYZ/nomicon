@@ -1,40 +1,16 @@
-# Lifetimes
+# ライフタイム
 
-Rust enforces these rules through *lifetimes*. Lifetimes are named
-regions of code that a reference must be valid for. Those regions
-may be fairly complex, as they correspond to paths of execution
-in the program. There may even be holes in these paths of execution,
-as it's possible to invalidate a reference as long as it's reinitialized
-before it's used again. Types which contain references (or pretend to)
-may also be tagged with lifetimes so that Rust can prevent them from
-being invalidated as well.
+Rust は*ライフタイム*を通じて、これらの規則を強制します。ライフタイムとは、参照が有効でなければならないコード上の名前付き領域です。プログラム内の実行経路に対応するため、その領域はかなり複雑になることがあります。実行経路の途中に穴ができることさえあります。参照を無効化しても、再び使う前に再初期化すればよいからです。参照（または参照を含むかのように振る舞うもの）を含む型にもライフタイムを付けられ、Rust はそれらが無効化されるのを防げます。
 
-In most of our examples, the lifetimes will coincide with scopes. This is
-because our examples are simple. The more complex cases where they don't
-coincide are described below.
+ほとんどの例では、ライフタイムはスコープと一致します。例が単純だからです。一致しない、より複雑なケースについては以下で説明します。
 
-Within a function body, Rust generally doesn't let you explicitly name the
-lifetimes involved. This is because it's generally not really necessary
-to talk about lifetimes in a local context; Rust has all the information and
-can work out everything as optimally as possible. Many anonymous scopes and
-temporaries that you would otherwise have to write are often introduced to
-make your code Just Work.
+関数本体の中では、Rust は通常、関係するライフタイムを明示的に名前で指定させません。ローカルな文脈ではライフタイムについて述べる必要があまりなく、Rust が必要な情報をすべて持ち、最適な形で推論できるからです。コードを「そのまま動かす」ために、書かなければならないはずの無名スコープや一時値が導入されることもよくあります。
 
-However once you cross the function boundary, you need to start talking about
-lifetimes. Lifetimes are denoted with an apostrophe: `'a`, `'static`. To dip
-our toes with lifetimes, we're going to pretend that we're actually allowed
-to label scopes with lifetimes, and desugar the examples from the start of
-this chapter.
+しかし、関数の境界を越えると、ライフタイムについて述べる必要が出てきます。ライフタイムは `'a` や `'static` のようにアポストロフィで表します。ライフタイムの初歩を学ぶため、この章の最初に出てきた例を、スコープにライフタイムのラベルを付けられるものとして脱糖してみましょう。
 
-Originally, our examples made use of *aggressive* sugar -- high fructose corn
-syrup even -- around scopes and lifetimes, because writing everything out
-explicitly is *extremely noisy*. All Rust code relies on aggressive inference
-and elision of "obvious" things.
+もとの例では、スコープやライフタイムに*強力な*シンタックスシュガー（高果糖コーンシロップと言ってもよいほど）が使われていました。すべてを明示的に書くのは*非常に冗長*だからです。Rust のコードはどれも、積極的な推論と「明らかな」ものの省略に大きく頼っています。
 
-One particularly interesting piece of sugar is that each `let` statement
-implicitly introduces a scope. For the most part, this doesn't really matter.
-However it does matter for variables that refer to each other. As a simple
-example, let's completely desugar this simple piece of Rust code:
+特に興味深いシンタックスシュガーの1つは、各 `let` 文が暗黙的にスコープを導入することです。ほとんどの場合、これは問題になりません。しかし、互いを参照する変数では重要です。簡単な例として、次の Rust コードを完全に脱糖してみましょう。
 
 ```rust
 let x = 0;
@@ -42,29 +18,27 @@ let y = &x;
 let z = &y;
 ```
 
-The borrow checker always tries to minimize the extent of a lifetime, so it will
-likely desugar to the following:
+借用チェッカーは常にライフタイムの範囲を最小にしようとするため、おそらく次のように脱糖されます。
 
 <!-- ignore: desugared code -->
 ```rust,ignore
-// NOTE: `'a: {` and `&'b x` is not valid syntax!
+// 注意: `'a: {` と `&'b x` は正当な構文ではありません。
 'a: {
     let x: i32 = 0;
     'b: {
-        // lifetime used is 'b because that's good enough.
+        // 'b で十分なので、ここでは 'b が使われます。
         let y: &'b i32 = &'b x;
         'c: {
-            // ditto on 'c
-            let z: &'c &'b i32 = &'c y; // "a reference to a reference to an i32" (with lifetimes annotated)
+            // 'c も同様です。
+            let z: &'c &'b i32 = &'c y; // 「i32 への参照への参照」（ライフタイム注釈付き）
         }
     }
 }
 ```
 
-Wow. That's... awful. Let's all take a moment to thank Rust for making this easier.
+うわあ。これは……ひどいですね。これを簡単にしてくれる Rust に、みんなで感謝しましょう。
 
-Actually passing references to outer scopes will cause Rust to infer
-a larger lifetime:
+外側のスコープに参照を渡すと、Rust はより長いライフタイムを推論します。
 
 ```rust
 let x = 0;
@@ -80,8 +54,8 @@ z = y;
     'b: {
         let z: &'b i32;
         'c: {
-            // Must use 'b here because the reference to x is
-            // being passed to the scope 'b.
+            // x への参照がスコープ 'b に渡されるので、
+            // ここでは 'b を使う必要があります。
             let y: &'b i32 = &'b x;
             z = y;
         }
@@ -89,9 +63,9 @@ z = y;
 }
 ```
 
-## Example: references that outlive referents
+## 例: 参照先より長く存続する参照
 
-Alright, let's look at some of those examples from before:
+それでは、先ほどの例を見てみましょう。
 
 ```rust,compile_fail
 fn as_str(data: &u32) -> &str {
@@ -100,7 +74,7 @@ fn as_str(data: &u32) -> &str {
 }
 ```
 
-desugars to:
+これは次のように脱糖されます。
 
 <!-- ignore: desugared code -->
 ```rust,ignore
@@ -112,23 +86,11 @@ fn as_str<'a>(data: &'a u32) -> &'a str {
 }
 ```
 
-This signature of `as_str` takes a reference to a u32 with *some* lifetime, and
-promises that it can produce a reference to a str that can live *just as long*.
-Already we can see why this signature might be trouble. That basically implies
-that we're going to find a str somewhere in the scope the reference
-to the u32 originated in, or somewhere *even earlier*. That's a bit of a tall
-order.
+`as_str` のシグネチャは、*ある*ライフタイムを持つ `u32` への参照を受け取り、それと*同じ長さだけ*存続できる `str` への参照を生成すると約束しています。このシグネチャが問題になりそうなのは、すでに分かります。つまり、`u32` への参照が生じたスコープか、あるいは*それより前*のどこかで `str` を見つけなければならないのです。なかなか厳しい要求です。
 
-We then proceed to compute the string `s`, and return a reference to it. Since
-the contract of our function says the reference must outlive `'a`, that's the
-lifetime we infer for the reference. Unfortunately, `s` was defined in the
-scope `'b`, so the only way this is sound is if `'b` contains `'a` -- which is
-clearly false since `'a` must contain the function call itself. We have therefore
-created a reference whose lifetime outlives its referent, which is *literally*
-the first thing we said that references can't do. The compiler rightfully blows
-up in our face.
+次に文字列 `s` を計算し、その参照を返そうとします。この関数の契約では、返す参照は `'a` より長く存続しなければならないため、その参照には `'a` が推論されます。ところが `s` はスコープ `'b` で定義されているため、これが健全であるには `'b` が `'a` を含んでいなければなりません。これは明らかに成り立ちません。`'a` は関数呼び出しそのものを含む必要があるからです。こうして、参照先より長く存続する参照を作ってしまいました。これは、参照ができないと最初に述べたことそのものです。コンパイラが正当にエラーを出します。
 
-To make this more clear, we can expand the example:
+より分かりやすくするため、例を展開できます。
 
 <!-- ignore: desugared code -->
 ```rust,ignore
@@ -143,19 +105,19 @@ fn main() {
     'c: {
         let x: u32 = 0;
         'd: {
-            // An anonymous scope is introduced because the borrow does not
-            // need to last for the whole scope x is valid for. The return
-            // of as_str must find a str somewhere before this function
-            // call. Obviously not happening.
+            // 借用は x が有効なスコープ全体にわたって存続する必要がないため、
+            // 無名スコープが導入されます。as_str の戻り値は、
+            // この関数呼び出しより前のどこかにある str を見つけなければなりません。
+            // そんなことが起こるはずはありません。
             println!("{}", as_str::<'d>(&'d x));
         }
     }
 }
 ```
 
-Shoot!
+しまった！
 
-Of course, the right way to write this function is as follows:
+もちろん、この関数を正しく書くには次のようにします。
 
 ```rust
 fn to_string(data: &u32) -> String {
@@ -163,17 +125,15 @@ fn to_string(data: &u32) -> String {
 }
 ```
 
-We must produce an owned value inside the function to return it! The only way
-we could have returned an `&'a str` would have been if it was in a field of the
-`&'a u32`, which is obviously not the case.
+関数から返すには、関数内で所有する値を生成しなければなりません！`&'a str` を返せるのは、それが `&'a u32` のフィールドに含まれている場合だけですが、明らかにそうではありません。
 
-(Actually we could have also just returned a string literal, which as a global
-can be considered to reside at the bottom of the stack; though this limits
-our implementation *just a bit*.)
+（実際には、文字列リテラルを返すこともできます。グローバルな値である文字列リテラルは、スタックの底に存在すると考えられるからです。ただし、そうすると実装が*ほんの少しだけ*制限されます。）
 
-## Example: aliasing a mutable reference
+<a id="example-aliasing-a-mutable-reference"></a>
 
-How about the other example:
+## 例: 可変参照のエイリアシング
+
+もう一つの例を見てみましょう。
 
 ```rust,compile_fail
 let mut data = vec![1, 2, 3];
@@ -187,12 +147,12 @@ println!("{}", x);
 'a: {
     let mut data: Vec<i32> = vec![1, 2, 3];
     'b: {
-        // 'b is as big as we need this borrow to be
-        // (just need to get to `println!`)
+        // 'b はこの借用が必要な長さだけ続きます。
+        // （`println!` まで届けば十分です。）
         let x: &'b i32 = Index::index::<'b>(&'b data, 0);
         'c: {
-            // Temporary scope because we don't need the
-            // &mut to last any longer.
+            // 一時スコープです。&mut は
+            // これ以上長く存続する必要がありません。
             Vec::push(&'c mut data, 4);
         }
         println!("{}", x);
@@ -200,49 +160,27 @@ println!("{}", x);
 }
 ```
 
-The problem here is a bit more subtle and interesting. We want Rust to
-reject this program for the following reason: We have a live shared reference `x`
-to a descendant of `data` when we try to take a mutable reference to `data`
-to `push`. This would create an aliased mutable reference, which would
-violate the *second* rule of references.
+ここでの問題は、もう少し微妙で興味深いものです。次の理由から、Rust はこのプログラムを拒否すると考えられます。`push` のために `data` への可変参照を取ろうとする時点で、`data` の子孫への共有参照 `x` が生存中です。これにより可変参照に別名ができ、参照に関する*2つ目*の規則に違反するからです。
 
-However this is *not at all* how Rust reasons that this program is bad. Rust
-doesn't understand that `x` is a reference to a subpath of `data`. It doesn't
-understand `Vec` at all. What it *does* see is that `x` has to live for `'b` in
-order to be printed. The signature of `Index::index` subsequently demands that
-the reference we take to `data` has to survive for `'b`. When we try to call
-`push`, it then sees us try to make an `&'c mut data`. Rust knows that `'c` is
-contained within `'b`, and rejects our program because the `&'b data` must still
-be alive!
+しかし、Rust がこのプログラムを不正だと判断する仕組みは、*まったく異なります*。Rust は `x` が `data` の部分パスへの参照であることを理解しません。`Vec` のことも理解しません。Rust が*実際に*見るのは、`println!` のために `x` が `'b` の間存続しなければならないことです。すると `Index::index` のシグネチャにより、`data` への参照も `'b` の間存続しなければなりません。`push` を呼び出そうとすると、Rust は `&'c mut data` を作ろうとしていると判断します。`'c` が `'b` に含まれることを知っているため、`&'b data` がまだ生存しているとしてプログラムを拒否します。
 
-Here we see that the lifetime system is much more coarse than the reference
-semantics we're actually interested in preserving. For the most part, *that's
-totally ok*, because it keeps us from spending all day explaining our program
-to the compiler. However it does mean that several programs that are totally
-correct with respect to Rust's *true* semantics are rejected because lifetimes
-are too dumb.
+ここから、ライフタイムシステムは、実際に保ちたい参照の意味論よりも、はるかに粗いことが分かります。たいていの場合、*それでまったく問題ありません*。プログラムをコンパイラに説明するために一日中費やさずに済むからです。ただし、ライフタイムの仕組みが単純すぎるために、Rust の*本来の*意味論ではまったく正しいプログラムが拒否されることもあります。
 
-## The area covered by a lifetime
+## ライフタイムが及ぶ範囲
 
-A reference (sometimes called a *borrow*) is *alive* from the place it is
-created to its last use. The borrowed value needs to outlive only borrows that
-are alive. This looks simple, but there are a few subtleties.
+参照（*借用*とも呼ばれます）は、作られた場所から最後に使われる場所まで*生存しています*。借用される値は、生存中の借用に対してのみ、それより長く存続していればよいのです。これは単純に見えますが、いくつか注意点があります。
 
-The following snippet compiles, because after printing `x`, it is no longer
-needed, so it doesn't matter if it is dangling or aliased (even though the
-variable `x` *technically* exists to the very end of the scope).
+次のコードはコンパイルできます。`x` は出力後には不要なので、（変数 `x` 自体は技術的にはスコープの最後まで存在しますが）ダングリングしたり、別名が付いたりしても問題にならないからです。
 
 ```rust
 let mut data = vec![1, 2, 3];
 let x = &data[0];
 println!("{}", x);
-// This is OK, x is no longer needed
+// x はもう必要ありません。これは問題ありません。
 data.push(4);
 ```
 
-However, if the value has a destructor, the destructor is run at the end of the
-scope. And running the destructor is considered a use ‒ obviously the last one.
-So, this will *not* compile.
+しかし、値がデストラクタを持つ場合、デストラクタはスコープの末尾で実行されます。そしてデストラクタの実行は使用とみなされます。当然、それが最後の使用です。そのため、次のコードは*コンパイルできません*。
 
 ```rust,compile_fail
 #[derive(Debug)]
@@ -256,13 +194,12 @@ let mut data = vec![1, 2, 3];
 let x = X(&data[0]);
 println!("{:?}", x);
 data.push(4);
-// Here, the destructor is run and therefore this'll fail to compile.
+// ここでデストラクタが実行されるため、コンパイルに失敗します。
 ```
 
-One way to convince the compiler that `x` is no longer valid is by using `drop(x)` before `data.push(4)`.
+`data.push(4)` より前に `drop(x)` を使うと、`x` はもう有効でないことをコンパイラに納得させられます。
 
-Furthermore, there might be multiple possible last uses of the borrow, for
-example in each branch of a condition.
+さらに、条件分岐の各分岐のように、借用の最後の使用箇所が複数あることもあります。
 
 ```rust
 # fn some_condition() -> bool { true }
@@ -270,33 +207,26 @@ let mut data = vec![1, 2, 3];
 let x = &data[0];
 
 if some_condition() {
-    println!("{}", x); // This is the last use of `x` in this branch
-    data.push(4);      // So we can push here
+    println!("{}", x); // この分岐での `x` の最後の使用です
+    data.push(4);      // ここで push できます
 } else {
-    // There's no use of `x` in here, so effectively the last use is the
-    // creation of x at the top of the example.
+    // ここでは `x` を使いません。そのため、実質的な最後の使用箇所は
+    // 例の最初にある x の生成時点です。
     data.push(5);
 }
 ```
 
-And a lifetime can have a pause in it. Or you might look at it as two distinct
-borrows just being tied to the same local variable. This often happens around
-loops (writing a new value of a variable at the end of the loop and using it for
-the last time at the top of the next iteration).
+ライフタイムには中断が入ることもあります。あるいは、同じローカル変数に結び付けられた、別々の2つの借用と考えることもできます。これはループでよく起こります（ループの末尾で変数に新しい値を書き込み、次の反復の先頭でその値を最後に使う場合などです）。
 
 ```rust
 let mut data = vec![1, 2, 3];
-// This mut allows us to change where the reference points to
+// この mut により、参照先を変更できます
 let mut x = &data[0];
 
-println!("{}", x); // Last use of this borrow
+println!("{}", x); // この借用の最後の使用
 data.push(4);
-x = &data[3]; // We start a new borrow here
+x = &data[3]; // ここで新しい借用を始めます
 println!("{}", x);
 ```
 
-Historically, Rust kept the borrow alive until the end of scope, so these
-examples might fail to compile with older compilers. Also, there are still some
-corner cases where Rust fails to properly shorten the live part of the borrow
-and fails to compile even when it looks like it should. These'll be solved over
-time.
+歴史的には、Rust は借用をスコープの末尾まで生存させていたため、古いコンパイラではこれらの例がコンパイルできないことがあります。また現在でも、借用の生存期間を適切に短くできず、本来コンパイルできそうな場合に失敗する境界的なケースがいくつかあります。こうした問題は、今後解決されていくでしょう。
