@@ -1,108 +1,54 @@
-# Alternative representations
+# 代替表現
 
-Rust allows you to specify alternative data layout strategies from the default.
+Rust では、デフォルトとは異なるデータレイアウト戦略を指定できます。
 
 ## repr(C)
 
-This is the most important `repr`. It has fairly simple intent: do what C does.
-The order, size, and alignment of fields is exactly what you would expect from C
-or C++. The type is also passed across `extern "C"` function call boundaries the
-same way C would pass the corresponding type. Any type you expect to pass through an FFI boundary should have
-`repr(C)`, as C is the lingua-franca of the programming world. This is also
-necessary to soundly do more elaborate tricks with data layout such as
-reinterpreting values as a different type.
+これが最も重要な `repr` です。意図はとても単純で、C と同じようにすることです。フィールドの順序、サイズ、アラインメントは、C や C++ で期待されるものと一致します。また、その型は、対応する C の型を C が渡すのと同じ方法で、`extern "C"` 関数呼び出しの境界を越えて渡されます。FFI 境界を越えて渡す型には `repr(C)` を付けるべきです。C はプログラミングの世界の共通語だからです。値を別の型として再解釈するなど、より複雑なデータレイアウト操作を健全に行うためにも必要です。
 
-We strongly recommend using [rust-bindgen] and/or [cbindgen] to manage your FFI
-boundaries for you. The Rust team works closely with those projects to ensure
-that they work robustly and are compatible with current and future guarantees
-about type layouts and `repr`s.
+FFI 境界の管理には、[rust-bindgen] や [cbindgen] を使うことを強く推奨します。Rust チームはこれらのプロジェクトと緊密に連携し、型レイアウトと `repr` に関する現在および将来の保証に対して、堅牢に動作し互換性を保てるようにしています。
 
-The interaction of `repr(C)` with Rust's more exotic data layout features must be
-kept in mind. Due to its dual purpose as "for FFI" and "for layout control",
-`repr(C)` can be applied to types that will be nonsensical or problematic if
-passed through the FFI boundary.
+`repr(C)` と Rust のより特殊なデータレイアウト機能の相互作用にも留意する必要があります。「FFI のため」と「レイアウト制御のため」という2つの目的があるため、FFI 境界を越えて渡すと意味をなさなかったり、問題になったりする型にも `repr(C)` を適用できます。
 
-* ZSTs are still zero-sized, even though this is not a standard behavior in
-C, and is explicitly contrary to the behavior of an empty type in C++, which
-says they should still consume a byte of space.
+* ZST は依然としてサイズ0です。これは C の標準的な動作ではなく、空型も1バイトを占めるべきだとする C++ の動作とは明確に異なります。
 
-* DST pointers (wide pointers) and tuples are not a concept
-  in C, and as such are never FFI-safe.
+* DST へのポインタ（ワイドポインタ）とタプルは C に存在しない概念なので、FFI 安全ではありません。
 
-* Enums with fields also aren't a concept in C or C++, but a valid bridging
-  of the types [is defined][really-tagged].
+* フィールドを持つ enum も C や C++ に存在しない概念ですが、これらの型を正しく橋渡しする方法は[定義されています][really-tagged]。
 
-* If `T` is an [FFI-safe non-nullable pointer
-  type](ffi.html#the-nullable-pointer-optimization),
-  `Option<T>` is guaranteed to have the same layout and ABI as `T` and is
-  therefore also FFI-safe. As of this writing, this covers `&`, `&mut`,
-  and function pointers, all of which can never be null.
+* `T` が[FFI 安全でヌルにならないポインタ型](ffi.html#the-nullable-pointer-optimization)なら、`Option<T>` は `T` と同じレイアウトと ABI を持つことが保証されるため、これも FFI 安全です。執筆時点では、`&`、`&mut`、関数ポインタが該当し、いずれもヌルにはなりません。
 
-* Tuple structs are like structs with regards to `repr(C)`, as the only
-  difference from a struct is that the fields aren’t named.
+* タプル構造体は `repr(C)` に関して構造体と同じです。違いはフィールドに名前が付いていないことだけです。
 
-* `repr(C)` is equivalent to one of `repr(u*)` (see the next section) for
-fieldless enums. The chosen size and sign is the default enum size and sign for the target platform's C
-application binary interface (ABI). Note that enum representation in C is implementation
-defined, so this is really a "best guess". In particular, this may be incorrect
-when the C code of interest is compiled with certain flags.
+* フィールドレス enum では、`repr(C)` は `repr(u*)`（次の節を参照）のいずれかと等価です。選ばれるサイズと符号は、対象プラットフォームの C アプリケーションバイナリインターフェース（ABI）における、デフォルトの enum のサイズと符号です。C における enum の表現は実装依存なので、これはあくまで「最善の推測」です。特に、対象の C コードが特定のフラグを付けてコンパイルされている場合、誤っている可能性があります。
 
-* Fieldless enums with `repr(C)` or `repr(u*)` still may not be set to an
-integer value without a corresponding variant, even though this is
-permitted behavior in C or C++. It is undefined behavior to (unsafely)
-construct an instance of an enum that does not match one of its
-variants. (This allows exhaustive matches to continue to be written and
-compiled as normal.)
+* `repr(C)` または `repr(u*)` を付けたフィールドレス enum でも、対応するバリアントがない整数値を設定してはなりません。C や C++ では許される動作ですが、そのバリアントのいずれにも一致しない enum の値を（アンセーフに）構築すると未定義動作になります。これにより、網羅的な `match` を通常どおり記述し、コンパイルできます。
 
 ## repr(transparent)
 
-`#[repr(transparent)]` can only be used on a struct or single-variant enum that has a single non-zero-sized field (there may be additional zero-sized fields).
-The effect is that the layout and ABI of the whole struct/enum is guaranteed to be the same as that one field.
+`#[repr(transparent)]` は、サイズが0でないフィールドを1つだけ持つ構造体、またはバリアントが1つだけの enum に使えます（サイズ0のフィールドは追加しても構いません）。この属性により、構造体／enum 全体のレイアウトと ABI が、その唯一のフィールドと同じであることが保証されます。
 
-> NOTE: There's a `transparent_unions` nightly feature to apply `repr(transparent)` to unions,
-> but it hasn't been stabilized due to design concerns. See the [tracking issue][issue-60405] for more details.
+> 注: union に `repr(transparent)` を適用する nightly 機能 `transparent_unions` がありますが、設計上の懸念から安定化されていません。詳しくは[追跡 issue][issue-60405]を参照してください。
 
-The goal is to make it possible to transmute between the single field and the
-struct/enum. An example of that is [`UnsafeCell`], which can be transmuted into
-the type it wraps ([`UnsafeCell`] also uses the unstable [no_niche][no-niche-pull],
-so its ABI is not actually guaranteed to be the same when nested in other types).
+この `repr` の目的は、単一のフィールドと構造体／enum の間で `transmute` できるようにすることです。例として [`UnsafeCell`] があります。これは内包する型に `transmute` できます（[`UnsafeCell`] は不安定な [no_niche][no-niche-pull] も使っているため、ほかの型にネストされた場合に ABI が同じになることまでは実際には保証されません）。
 
-Also, passing the struct/enum through FFI where the inner field type is expected on
-the other side is guaranteed to work. In particular, this is necessary for
-`struct Foo(f32)` or `enum Foo { Bar(f32) }` to always have the same ABI as `f32`.
+また、反対側で内側のフィールド型が期待される FFI 境界を構造体／enum が通過する場合も、正しく動作することが保証されます。特に、`struct Foo(f32)` や `enum Foo { Bar(f32) }` が常に `f32` と同じ ABI を持つために必要です。
 
-This repr is only considered part of the public ABI of a type if either the single
-field is `pub`, or if its layout is documented in prose. Otherwise, the layout should
-not be relied upon by other crates.
+この `repr` が型の公開 ABI の一部とみなされるのは、単一のフィールドが `pub` であるか、そのレイアウトが文章で文書化されている場合だけです。それ以外では、ほかのクレートがそのレイアウトに依存すべきではありません。
 
-More details are in the [RFC 1758][rfc-transparent] and the [RFC 2645][rfc-transparent-unions-enums].
+詳しくは [RFC 1758][rfc-transparent] と [RFC 2645][rfc-transparent-unions-enums] を参照してください。
 
 ## repr(u*), repr(i*)
 
-These specify the size and sign to make a fieldless enum. If the discriminant overflows
-the integer it has to fit in, it will produce a compile-time error. You can
-manually ask Rust to allow this by setting the overflowing element to explicitly
-be 0. However Rust will not allow you to create an enum where two variants have
-the same discriminant.
+これらはフィールドレス enum のサイズと符号を指定します。判別子が収まるべき整数型の範囲を超えると、コンパイル時エラーになります。オーバーフローするバリアントの判別子を明示的に0に設定すれば、Rust にこれを許可するよう求めることもできます。ただし、2つのバリアントが同じ判別子を持つ enum は作れません。
 
-The term "fieldless enum" only means that the enum doesn't have data in any
-of its variants. A fieldless enum without a `repr` is
-still a Rust native type, and does not have a stable layout or representation.
-Adding a `repr(u*)`/`repr(i*)` causes it to be treated exactly like the specified
-integer type for layout purposes (except that the compiler will still exploit its
-knowledge of "invalid" values at this type to optimize enum layout, such as when
-this enum is wrapped in `Option`). Note that the function call ABI for these
-types is still in general unspecified, except that across `extern "C"` calls they
-are ABI-compatible with C enums of the same sign and size.
+「フィールドレス enum」とは、どのバリアントもデータを持たない enum のことです。`repr` のないフィールドレス enum も Rust 固有の型であり、安定したレイアウトや表現を持ちません。`repr(u*)`／`repr(i*)` を付けると、レイアウト上は指定した整数型とまったく同じように扱われます（ただしコンパイラは、その型で「無効な」値が何かという知識を引き続き利用し、たとえば `Option` に包まれたときに enum のレイアウトを最適化します）。これらの型の関数呼び出し ABI は、一般には依然として規定されていません。ただし `extern "C"` 呼び出しでは、同じ符号とサイズを持つ C の enum と ABI 互換です。
 
-If the enum has fields, the effect is similar to the effect of `repr(C)`
-in that there is a defined layout of the type. This makes it possible to
-pass the enum to C code, or access the type's raw representation and directly
-manipulate its tag and fields. See [the RFC][really-tagged] for details.
+enum がフィールドを持つ場合、型のレイアウトが定義されるという点で、`repr(C)` と同様の効果があります。これにより、enum を C コードに渡したり、型の生の表現にアクセスしてタグやフィールドを直接操作したりできます。詳しくは[RFC][really-tagged]を参照してください。
 
-These `repr`s have no effect on a struct.
+これらの `repr` は構造体には影響しません。
 
-Adding an explicit `repr(u*)`, `repr(i*)`, or `repr(C)` to an enum with fields suppresses the null-pointer optimization, like:
+フィールドを持つ enum に `repr(u*)`、`repr(i*)`、または `repr(C)` を明示的に付けると、次のようにヌルポインタ最適化が抑制されます。
 
 ```rust
 # use std::mem::size_of;
@@ -121,43 +67,27 @@ assert_eq!(8, size_of::<MyOption<&u16>>());
 assert_eq!(16, size_of::<MyReprOption<&u16>>());
 ```
 
-This optimization still applies to fieldless enums with an explicit `repr(u*)`, `repr(i*)`, or `repr(C)`.
+この最適化は、`repr(u*)`、`repr(i*)`、または `repr(C)` を明示的に付けたフィールドレス enum には、引き続き適用されます。
 
 ## repr(packed), repr(packed(n))
 
-`repr(packed(n))` (where `n` is a power of two) forces the type to have an
-alignment of *at most* `n`. Most commonly used without an explicit `n`,
-`repr(packed)` is equivalent to `repr(packed(1))` which forces Rust to strip
-any padding, and only align the type to a byte. This may improve the memory
-footprint, but will likely have other negative side-effects.
+`repr(packed(n))`（`n` は2のべき乗）は、型のアラインメントを最大でも `n` にします。`n` を明示しない `repr(packed)` が最もよく使われ、これは `repr(packed(1))` と等価です。Rust にすべてのパディングを取り除かせ、型をバイト単位にのみアラインさせます。メモリ使用量を減らせる可能性はありますが、ほかの悪影響も生じる可能性が高いです。
 
-In particular, most architectures *strongly* prefer values to be naturally
-aligned. This may mean that unaligned loads are penalized (x86), or even fault
-(some ARM chips). For simple cases like directly loading or storing a packed
-field, the compiler might be able to paper over alignment issues with shifts
-and masks. However if you take a reference to a packed field, it's unlikely
-that the compiler will be able to emit code to avoid an unaligned load.
+特に、ほとんどのアーキテクチャは値が自然なアラインメントを満たすことを*強く*好みます。アラインされていない読み込みは、x86 ではペナルティを受けたり、一部の ARM チップではフォルトしたりすることがあります。パックされたフィールドを直接読み書きする単純なケースなら、コンパイラはシフトやマスクでアラインメントの問題を覆い隠せるかもしれません。しかし、パックされたフィールドへの参照を作る場合、アラインされていない読み込みを避けるコードをコンパイラが出力できる可能性は低いでしょう。
 
-[As this can cause undefined behavior][ub loads], the lint has been implemented
-and it will become a hard error.
+[これにより未定義動作が起きる可能性がある][ub loads]ため、lint はすでに実装されており、いずれハードエラーになります。
 
-`repr(packed)/repr(packed(n))` is not to be used lightly. Unless you have
-extreme requirements, this should not be used.
+`repr(packed)`／`repr(packed(n))` は安易に使うものではありません。極端な要件がない限り、使うべきではありません。
 
-This repr is a modifier on `repr(C)` and `repr(Rust)`. For FFI compatibility
-you most likely always want to be explicit: `repr(C, packed)`.
+この `repr` は `repr(C)` と `repr(Rust)` の修飾子です。FFI 互換性のためには、おそらく常に `repr(C, packed)` のように明示する必要があります。
 
 ## repr(align(n))
 
-`repr(align(n))` (where `n` is a power of two) forces the type to have an
-alignment of *at least* `n`.
+`repr(align(n))`（`n` は2のべき乗）は、型のアラインメントを少なくとも `n` にします。
 
-This enables several tricks, like making sure neighboring elements of an array
-never share the same cache line with each other (which may speed up certain
-kinds of concurrent code).
+これにより、配列内で隣り合う要素が同じキャッシュラインを共有しないようにするなど、いくつかの工夫ができます。これによって、一部の並行コードが高速化する可能性があります。
 
-This is a modifier on `repr(C)` and `repr(Rust)`. It is incompatible with
-`repr(packed)`.
+これは `repr(C)` と `repr(Rust)` の修飾子です。`repr(packed)` とは併用できません。
 
 [drop flags]: drop-flags.html
 [ub loads]: https://github.com/rust-lang/rust/issues/27060

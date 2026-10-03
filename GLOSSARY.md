@@ -57,6 +57,11 @@
 | no-op | no-op（何もしない操作） | 実行しても効果のない操作です。 |
 | extern type | extern 型 | 外部で定義されるサイズ不明の型です。 |
 | irrefutable pattern | 反駁不能パターン | 常にマッチするパターンです。 |
+| tagged union | タグ付き共用体 | タグでバリアントを識別する共用体です。 |
+| FFI-safe | FFI 安全 | FFI 境界で安全に受け渡せる性質です。 |
+| cache line | キャッシュライン | キャッシュが一度に扱うメモリ領域です。 |
+| public ABI | 公開 ABI | 他クレートとの互換性に関わる型の ABI です。 |
+| natural alignment | 自然なアラインメント | 型が通常要求するアラインメントです。 |
 | vector / Vec | ベクタ / `Vec` | 一般名は「ベクタ」、Rust の型名は `Vec` のままです。 |
 
 ## 表記上の注意
