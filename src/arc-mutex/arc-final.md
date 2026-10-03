@@ -1,6 +1,10 @@
-# Final Code
+<a id="final-code"></a>
 
-Here's the final code, with some added comments and re-ordered imports:
+# 最終的なコード
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
+
+コメントをいくつか追加し、インポートの順序を変更した最終的なコードは次のとおりです。
 
 ```rust
 use std::marker::PhantomData;

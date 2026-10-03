@@ -1,26 +1,24 @@
-# Layout
+<a id="layout"></a>
 
-Let's start by making the layout for our implementation of `Arc`.
+# レイアウト
 
-An `Arc<T>` provides thread-safe shared ownership of a value of type `T`,
-allocated in the heap. Sharing implies immutability in Rust, so we don't need to
-design anything that manages access to that value, right? Although interior
-mutability types like Mutex allow Arc's users to create shared mutability, Arc
-itself doesn't need to concern itself with these issues.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-However there _is_ one place where Arc needs to concern itself with mutation:
-destruction. When all the owners of the Arc go away, we need to be able to
-`drop` its contents and free its allocation. So we need a way for an owner to
-know if it's the _last_ owner, and the simplest way to do that is with a count
-of the owners -- Reference Counting.
+まず、`Arc` の実装のレイアウトを作りましょう。
 
-Unfortunately, this reference count is inherently shared mutable state, so Arc
-_does_ need to think about synchronization. We _could_ use a Mutex for this, but
-that's overkill. Instead, we'll use atomics. And since everyone already needs a
-pointer to the T's allocation, we might as well put the reference count in that
-same allocation.
+`Arc<T>` は、ヒープにアロケートされた型 `T` の値に対して、スレッド安全な共有所有権を提供します。
+Rust では共有は不変性を意味するので、その値へのアクセスを管理する仕組みを設計する必要はありませんよね？
+Mutex のような内部可変性を持つ型により Arc の利用者は共有された可変性を実現できますが、Arc 自体はこの問題を気にする必要はありません。
 
-Naively, it would look something like this:
+しかし、Arc が変更を気にする必要のある箇所が一つ_あります_。破棄です。
+Arc の所有者がすべていなくなったとき、その内容を `drop` し、アロケーションを解放できなければなりません。
+そのため、所有者が自分は_最後の_所有者なのかを知る方法が必要です。その最も単純な方法は、所有者の数を数えること、つまり参照カウントです。
+
+残念ながら、この参照カウントは本質的に共有された可変状態なので、Arc は同期を考える_必要があります_。
+これには Mutex を使う_こともできます_が、それは大げさです。代わりにアトミックを使います。
+また、誰もがすでに T のアロケーションへのポインタを必要としているので、参照カウントも同じアロケーションに置くことにしましょう。
+
+素朴に実装すると、次のようになります。
 
 ```rust
 use std::sync::atomic;
@@ -35,26 +33,21 @@ pub struct ArcInner<T> {
 }
 ```
 
-This would compile, however it would be incorrect. First of all, the compiler
-will give us too strict variance. For example, an `Arc<&'static str>` couldn't
-be used where an `Arc<&'a str>` was expected. More importantly, it will give
-incorrect ownership information to the drop checker, as it will assume we don't
-own any values of type `T`. As this is a structure providing shared ownership of
-a value, at some point there will be an instance of this structure that entirely
-owns its data. See [the chapter on ownership and lifetimes](../ownership.md) for
-all the details on variance and drop check.
+これはコンパイルできますが、正しくありません。まず、コンパイラが与える変性が厳しすぎます。
+例えば、`Arc<&'a str>` が期待される場所で `Arc<&'static str>` を使えなくなります。
+さらに重要なのは、型 `T` の値を何も所有していないと見なされるため、ドロップチェッカーに誤った所有権情報を与えることです。
+これは値の共有所有権を提供する構造体なので、いずれかの時点で、そのデータを完全に所有するこの構造体のインスタンスが存在します。
+変性とドロップチェックの詳細は、[所有権とライフタイムの章](../ownership.md)を参照してください。
 
-To fix the first problem, we can use `NonNull<T>`. Note that `NonNull<T>` is a
-wrapper around a raw pointer that declares that:
+最初の問題を解決するために、`NonNull<T>` を使えます。`NonNull<T>` は、次のことを宣言する生ポインタのラッパーであることに注意してください。
 
-* We are covariant over `T`
-* Our pointer is never null
+* `T` に関して共変です
+* ポインタがヌルになることはありません
 
-To fix the second problem, we can include a `PhantomData` marker containing an
-`ArcInner<T>`. This will tell the drop checker that we have some notion of
-ownership of a value of `ArcInner<T>` (which itself contains some `T`).
+二つ目の問題を解決するために、`ArcInner<T>` を含む `PhantomData` マーカーを加えられます。
+これにより、`ArcInner<T>` の値（それ自体が何らかの `T` を含みます）について、何らかの所有権を持つことをドロップチェッカーに伝えます。
 
-With these changes we get our final structure:
+これらの変更によって、最終的な構造体が得られます。
 
 ```rust
 use std::marker::PhantomData;

@@ -1,30 +1,27 @@
-# Destructors
+<a id="destructors"></a>
 
-What the language *does* provide is full-blown automatic destructors through the
-`Drop` trait, which provides the following method:
+# デストラクタ
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+言語が*実際に*提供するのは、`Drop` トレイトを通じた本格的な自動デストラクタです。このトレイトは次のメソッドを提供します。
 
 <!-- ignore: function header -->
 ```rust,ignore
 fn drop(&mut self);
 ```
 
-This method gives the type time to somehow finish what it was doing.
+このメソッドは、型が行っていたことを何らかの方法で終わらせるための時間を与えます。
 
-**After `drop` is run, Rust will recursively try to drop all of the fields
-of `self`.**
+**`drop` の実行後、Rust は `self` のすべてのフィールドを再帰的にドロップしようとします。**
 
-This is a convenience feature so that you don't have to write "destructor
-boilerplate" to drop children. If a struct has no special logic for being
-dropped other than dropping its children, then it means `Drop` doesn't need to
-be implemented at all!
+これは、子をドロップするための「デストラクタの定型コード」を書かずに済む便利な機能です。構造体がドロップされる際に、子をドロップする以外の特別なロジックがなければ、`Drop` をまったく実装する必要がないということです！
 
-**There is no stable way to prevent this behavior in Rust 1.0.**
+**Rust 1.0 では、この挙動を防ぐ安定版の方法はありません。**
 
-Note that taking `&mut self` means that even if you could suppress recursive
-Drop, Rust will prevent you from e.g. moving fields out of self. For most types,
-this is totally fine.
+`&mut self` を受け取るので、たとえ再帰的な Drop を抑止できても、たとえば self からフィールドをムーブして取り出すことは Rust によって防がれる点に注意してください。ほとんどの型では、これはまったく問題ありません。
 
-For instance, a custom implementation of `Box` might write `Drop` like this:
+たとえば、独自の `Box` 実装では `Drop` を次のように書くかもしれません。
 
 ```rust
 #![feature(ptr_internals, allocator_api)]
@@ -47,11 +44,9 @@ impl<T> Drop for Box<T> {
 # fn main() {}
 ```
 
-and this works fine because when Rust goes to drop the `ptr` field it just sees
-a [Unique] that has no actual `Drop` implementation. Similarly nothing can
-use-after-free the `ptr` because when drop exits, it becomes inaccessible.
+これは問題なく動作します。Rust が `ptr` フィールドをドロップする際、実際の `Drop` 実装を持たない [Unique] があるだけだからです。同様に、drop を抜けると `ptr` にアクセスできなくなるため、何も `ptr` の解放後使用を起こせません。
 
-However this wouldn't work:
+しかし、次のコードはうまく動きません。
 
 ```rust
 #![feature(allocator_api, ptr_internals)]
@@ -87,12 +82,9 @@ impl<T> Drop for SuperBox<T> {
 # fn main() {}
 ```
 
-After we deallocate the `box`'s ptr in SuperBox's destructor, Rust will
-happily proceed to tell the box to Drop itself and everything will blow up with
-use-after-frees and double-frees.
+SuperBox のデストラクタで `box` の ptr をデアロケートした後も、Rust は構わず box 自身に Drop するよう指示するので、解放後使用と二重解放によってすべてが破綻します。
 
-Note that the recursive drop behavior applies to all structs and enums
-regardless of whether they implement Drop. Therefore something like
+再帰的なドロップの挙動は、Drop を実装しているかどうかにかかわらず、すべての構造体と enum に適用される点に注意してください。したがって、次のようなものは、
 
 ```rust
 struct Boxy<T> {
@@ -102,11 +94,9 @@ struct Boxy<T> {
 }
 ```
 
-will have the destructors of its `data1` and `data2` fields called whenever it "would" be
-dropped, even though it itself doesn't implement Drop. We say that such a type
-*needs Drop*, even though it is not itself Drop.
+自身が Drop を実装していなくても、ドロップ「されるはず」のときには毎回 `data1` と `data2` フィールドのデストラクタが呼ばれます。このような型は、それ自体は Drop でなくても、*Drop を必要とする*と言います。
 
-Similarly,
+同様に、
 
 ```rust
 enum Link {
@@ -115,16 +105,11 @@ enum Link {
 }
 ```
 
-will have its inner Box field dropped if and only if an instance stores the
-Next variant.
+では、インスタンスが Next バリアントを格納している場合に、かつその場合に限って、内部の Box フィールドがドロップされます。
 
-In general this works really nicely because you don't need to worry about
-adding/removing drops when you refactor your data layout. Still there's
-certainly many valid use cases for needing to do trickier things with
-destructors.
+一般にこれは非常にうまく機能します。データレイアウトをリファクタリングする際に、ドロップの追加や削除を気にする必要がないからです。それでも、デストラクタでもっと複雑なことをする必要がある、妥当な用途は確かにたくさんあります。
 
-The classic safe solution to overriding recursive drop and allowing moving out
-of Self during `drop` is to use an Option:
+再帰的なドロップを上書きし、`drop` の間に Self からムーブして取り出せるようにする、古典的で安全な解決策は Option を使うことです。
 
 ```rust
 #![feature(allocator_api, ptr_internals)]
@@ -163,15 +148,8 @@ impl<T> Drop for SuperBox<T> {
 # fn main() {}
 ```
 
-However this has fairly odd semantics: you are saying that a field that *should*
-always be Some *may* be None, just because of what happens in the destructor. Of
-course this conversely makes a lot of sense: you can call arbitrary methods on
-self during the destructor, and this should prevent you from ever doing so after
-deinitializing the field. Not that it will prevent you from producing any other
-arbitrarily invalid state in there.
+しかし、これはかなり奇妙なセマンティクスです。デストラクタで起こることだけを理由に、常に Some である*べき*フィールドが None である*可能性がある*と言っているからです。もちろん、逆にこれは十分理にかなっています。デストラクタの中では self の任意のメソッドを呼べますが、この仕組みはフィールドを未初期化状態に戻した後にそれを行うことを防ぐはずです。ただし、その中でほかの任意の不正な状態を作り出すことまで防ぐわけではありません。
 
-On balance this is an ok choice. Certainly what you should reach for by default.
-However, in the future we expect there to be a first-class way to announce that
-a field shouldn't be automatically dropped.
+総合的に見れば、これはまずまずの選択肢です。標準的な選択として使うべき方法であることは確かです。しかし、将来はフィールドを自動的にドロップすべきでないと宣言するための、正式にサポートされた方法が用意されると期待しています。
 
 [Unique]: phantom-data.html

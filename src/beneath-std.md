@@ -1,39 +1,37 @@
-# Beneath `std`
+<a id="beneath-std"></a>
 
-This section documents features that are normally provided by the `std` crate and
-that `#![no_std]` developers have to deal with (i.e. provide) to build
-`#![no_std]` binary crates.
+# `std` の下で
 
-## Using `libc`
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-In order to build a `#[no_std]` executable we will need `libc` as a dependency.
-We can specify this using our `Cargo.toml` file:
+この節では、通常は `std` クレートが提供する機能のうち、`#![no_std]` の開発者が `#![no_std]` バイナリクレートをビルドするために対処しなければならない（つまり、自分で提供しなければならない）ものを説明します。
+
+<a id="using-libc"></a>
+
+## `libc` の使用
+
+`#[no_std]` 実行可能ファイルをビルドするには、依存関係として `libc` が必要です。
+これは `Cargo.toml` ファイルで指定できます。
 
 ```toml
 [dependencies]
 libc = { version = "0.2.146", default-features = false }
 ```
 
-Note that the default features have been disabled. This is a critical step -
-**the default features of `libc` include the `std` crate and so must be
-disabled.**
+デフォルト機能を無効にしていることに注意してください。これは極めて重要な手順です。**`libc` のデフォルト機能には `std` クレートが含まれるため、無効にしなければなりません。**
 
-Alternatively, we can use the unstable `rustc_private` private feature together
-with an `extern crate libc;` declaration as shown in the examples below. Note that
-windows-msvc targets do not require a libc, and correspondingly there is no `libc`
-crate in their sysroot. We do not need the `extern crate libc;` below, and having it
-on a windows-msvc target would be a compile error.
+代わりに、以下の例のように、不安定な非公開機能 `rustc_private` を `extern crate libc;` 宣言とともに使用することもできます。windows-msvc ターゲットは libc を必要とせず、それに対応して sysroot に `libc` クレートがないことに注意してください。この場合、以下の `extern crate libc;` は不要であり、windows-msvc ターゲットで記述するとコンパイルエラーになります。
 
-## Writing an executable without `std`
+<a id="writing-an-executable-without-std"></a>
 
-We will probably need a nightly version of the compiler to produce
-a `#![no_std]` executable because on many platforms, we have to provide the
-`eh_personality` [lang item], which is unstable.
+## `std` なしで実行可能ファイルを書く
 
-You will need to define a symbol for the entry point that is suitable for your target. For example, `main`, `_start`, `WinMain`, or whatever starting point is relevant for your target.
-Additionally, you need to use the `#![no_main]` attribute to prevent the compiler from attempting to generate an entry point itself.
+`#![no_std]` 実行可能ファイルを生成するには、おそらく nightly 版のコンパイラが必要になります。多くのプラットフォームでは、不安定な[言語項目][lang item]である `eh_personality` を提供しなければならないためです。
 
-Additionally, it's required to define a [panic handler function](panic-handler.html).
+ターゲットに適したエントリポイントのシンボルを定義する必要があります。たとえば `main`、`_start`、`WinMain`、あるいはターゲットに対応するその他の開始点です。
+また、コンパイラが自らエントリポイントを生成しようとするのを防ぐため、`#![no_main]` 属性を使用する必要があります。
+
+さらに、[パニックハンドラ関数](panic-handler.html)の定義も必要です。
 
 ```rust
 #![feature(lang_items, core_intrinsics, rustc_private)]
@@ -66,12 +64,7 @@ fn rust_eh_personality() {}
 fn panic_handler(_info: &PanicInfo) -> ! { core::intrinsics::abort() }
 ```
 
-If you are working with a target that doesn't have binary releases of the
-standard library available via rustup (this probably means you are building the
-`core` crate yourself) and need compiler-rt intrinsics (i.e. you are probably
-getting linker errors when building an executable:
-``undefined reference to `__aeabi_memcpy'``), you need to manually link to the
-[`compiler_builtins` crate] to get those intrinsics and solve the linker errors.
+rustup 経由で標準ライブラリのバイナリリリースを利用できないターゲットを扱っていて（おそらく `core` クレートを自分でビルドしているということです）、compiler-rt の組み込み関数が必要な場合（つまり、おそらく実行可能ファイルのビルド時に ``undefined reference to `__aeabi_memcpy'`` というリンカーエラーが発生している場合）、これらの組み込み関数を取得し、リンカーエラーを解消するために、[`compiler_builtins` クレート][`compiler_builtins` crate] に手動でリンクする必要があります。
 
 [`compiler_builtins` crate]: https://crates.io/crates/compiler_builtins
 [lang item]: https://doc.rust-lang.org/nightly/unstable-book/language-features/lang-items.html

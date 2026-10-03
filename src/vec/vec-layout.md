@@ -1,4 +1,8 @@
+<a id="layout"></a>
+
 # レイアウト
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
 まず、構造体のレイアウトを決める必要があります。`Vec` は、アロケーションへのポインタ、アロケーションのサイズ、初期化済みの要素数という 3 つの部分から成ります。
 

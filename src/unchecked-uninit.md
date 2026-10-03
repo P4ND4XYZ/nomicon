@@ -1,17 +1,14 @@
-# Unchecked Uninitialized Memory
+<a id="unchecked-uninitialized-memory"></a>
 
-One interesting exception to this rule is working with arrays. Safe Rust doesn't
-permit you to partially initialize an array. When you initialize an array, you
-can either set every value to the same thing with `let x = [val; N]`, or you can
-specify each member individually with `let x = [val1, val2, val3]`.
-Unfortunately this is pretty rigid, especially if you need to initialize your
-array in a more incremental or dynamic way.
+# チェックされない未初期化メモリ
 
-Unsafe Rust gives us a powerful tool to handle this problem:
-[`MaybeUninit`]. This type can be used to handle memory that has not been fully
-initialized yet.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-With `MaybeUninit`, we can initialize an array element by element as follows:
+この規則の興味深い例外の1つは、配列を扱う場合です。安全な Rust は配列の部分的な初期化を許しません。配列を初期化するときは、`let x = [val; N]` ですべての値を同じにするか、`let x = [val1, val2, val3]` で各要素を個別に指定できます。残念ながら、特に配列を段階的または動的に初期化する必要がある場合、これはかなり融通が利きません。
+
+アンセーフな Rust は、この問題を扱う強力な道具として [`MaybeUninit`] を提供します。この型は、まだ完全には初期化されていないメモリを扱うために使えます。
+
+`MaybeUninit` を使うと、次のように配列を要素ごとに初期化できます。
 
 ```rust
 use std::mem::{self, MaybeUninit};
@@ -42,89 +39,44 @@ let x = {
 println!("{x:?}");
 ```
 
-This code proceeds in three steps:
+このコードは3つの手順で進みます。
 
-1. Create an array of `MaybeUninit<T>`.
+1. `MaybeUninit<T>` の配列を作ります。
 
-2. Initialize the array. The subtle aspect of this is that usually, when we use
-   `=` to assign to a value that the Rust type checker considers to already be
-   initialized (like `x[i]`), the old value stored on the left-hand side gets
-   dropped. This would be a disaster. However, in this case, the type of the
-   left-hand side is `MaybeUninit<Box<u32>>`, and dropping that does not do
-   anything! See below for some more discussion of this `drop` issue.
+2. 配列を初期化します。ここで微妙なのは、通常、Rust の型チェッカーが既に初期化済みとみなす値（`x[i]` など）に `=` で代入すると、左辺に格納されていた古い値がドロップされることです。これは大惨事になります。しかし、この場合の左辺の型は `MaybeUninit<Box<u32>>` であり、それをドロップしても何も起こりません！ この `drop` の問題については、以下でもう少し説明します。
 
-3. Finally, we have to change the type of our array to remove the
-   `MaybeUninit`. With current stable Rust, this requires a `transmute`.
-   This transmute is legal because in memory, `MaybeUninit<T>` looks the same as `T`.
+3. 最後に、配列の型を変更して `MaybeUninit` を取り除かなければなりません。現在の安定版 Rust では、これには `transmute` が必要です。メモリ上で `MaybeUninit<T>` は `T` と同じ姿をしているので、このトランスミュートは正当です。
 
-    However, note that in general, `Container<MaybeUninit<T>>>` does *not* look
-   the same as `Container<T>`! Imagine if `Container` was `Option`, and `T` was
-   `bool`, then `Option<bool>` exploits that `bool` only has two valid values,
-   but `Option<MaybeUninit<bool>>` cannot do that because the `bool` does not
-   have to be initialized.
+    ただし、一般に `Container<MaybeUninit<T>>>` は `Container<T>` と同じ姿では*ない*ことに注意してください！ `Container` が `Option`、`T` が `bool` だと考えてみましょう。`Option<bool>` は `bool` に有効な値が2つしかないことを利用しますが、`Option<MaybeUninit<bool>>` では `bool` が初期化済みである必要がないため、それを利用できません。
 
-    So, it depends on `Container` whether transmuting away the `MaybeUninit` is
-   allowed. For arrays, it is (and eventually the standard library will
-   acknowledge that by providing appropriate methods).
+    したがって、トランスミュートによって `MaybeUninit` を取り除いてよいかどうかは、`Container` によります。配列では許されます（そしていずれ標準ライブラリも、適切なメソッドを提供することでそれを認めるでしょう）。
 
-It's worth spending a bit more time on the loop in the middle, and in particular
-the assignment operator and its interaction with `drop`. If we wrote something like:
+途中のループ、特に代入演算子と `drop` の相互作用について、もう少し考えてみる価値があります。次のように書いたとすると、
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 *x[i].as_mut_ptr() = Box::new(i as u32); // WRONG!
 ```
 
-we would actually overwrite a `Box<u32>`, leading to `drop` of uninitialized
-data, which would cause much sadness and pain.
+実際には `Box<u32>` を上書きしてしまい、未初期化データの `drop` につながるため、大きな悲しみと苦痛を招きます。
 
-The correct alternative, if for some reason we cannot use `MaybeUninit::new`, is
-to use the [`ptr`] module. In particular, it provides three functions that allow
-us to assign bytes to a location in memory without dropping the old value:
-[`write`], [`copy`], and [`copy_nonoverlapping`].
+何らかの理由で `MaybeUninit::new` を使えない場合の正しい代替手段は、[`ptr`] モジュールを使うことです。特に、このモジュールは古い値をドロップせずにメモリ位置へバイトを代入できる3つの関数、[`write`]、[`copy`]、[`copy_nonoverlapping`] を提供します。
 
-* `ptr::write(ptr, val)` takes a `val` and moves it into the address pointed
-  to by `ptr`.
-* `ptr::copy(src, dest, count)` copies the bits that `count` T items would occupy
-  from src to dest. (this is equivalent to C's memmove -- note that the argument
-  order is reversed!)
-* `ptr::copy_nonoverlapping(src, dest, count)` does what `copy` does, but a
-  little faster on the assumption that the two ranges of memory don't overlap.
-  (this is equivalent to C's memcpy -- note that the argument order is reversed!)
+* `ptr::write(ptr, val)` は `val` を受け取り、`ptr` が指すアドレスへムーブします。
+* `ptr::copy(src, dest, count)` は、`count` 個の T の要素が占めるビットを src から dest へコピーします（C の memmove に相当します。引数の順序が逆であることに注意してください！）。
+* `ptr::copy_nonoverlapping(src, dest, count)` は `copy` と同じことをしますが、2つのメモリ範囲が重ならないという仮定のもと、少し高速です（C の memcpy に相当します。引数の順序が逆であることに注意してください！）。
 
-It should go without saying that these functions, if misused, will cause serious
-havoc or just straight up Undefined Behavior. The only requirement of these
-functions *themselves* is that the locations you want to read and write
-are allocated and properly aligned. However, the ways writing arbitrary bits to
-arbitrary locations of memory can break things are basically uncountable!
+言うまでもなく、これらの関数を誤用すると、深刻な混乱や、まさに未定義動作を引き起こします。これらの関数*自体*の唯一の要件は、読み書きしたい場所がアロケートされ、適切なアラインメントを満たしていることです。しかし、任意のメモリ位置に任意のビットを書き込むことで物事を壊す方法は、ほとんど数え切れません！
 
-It's worth noting that you don't need to worry about `ptr::write`-style
-shenanigans with types which don't implement `Drop` or contain `Drop` types,
-because Rust knows not to try to drop them. This is what we relied on in the
-above example.
+`Drop` を実装せず、`Drop` 型も含まない型については、`ptr::write` のような小細工を心配する必要がないことも重要です。Rust は、それらをドロップしようとしないことを知っているためです。上の例はこの性質に依存しています。
 
-However when working with uninitialized memory you need to be ever-vigilant for
-Rust trying to drop values you make like this before they're fully initialized.
-Every control path through that variable's scope must initialize the value
-before it ends, if it has a destructor.
-*[This includes code panicking](unwinding.html)*. `MaybeUninit` helps a bit
-here, because it does not implicitly drop its content - but all this really
-means in case of a panic is that instead of a double-free of the not yet
-initialized parts, you end up with a memory leak of the already initialized
-parts.
+しかし、未初期化メモリを扱う際は、このように作った値が完全に初期化される前に Rust がドロップしようとしないか、常に警戒する必要があります。値にデストラクタがあるなら、その変数のスコープを通るすべての制御経路は、終了する前にその値を初期化しなければなりません。
+*[コードがパニックする場合も含まれます](unwinding.html)*。`MaybeUninit` は内容を暗黙にドロップしないので、ここで少し役立ちます。ただし、パニック時にこれが実際に意味するのは、まだ初期化されていない部分の二重解放の代わりに、既に初期化された部分のメモリリークが生じるということだけです。
 
-Note that, to use the `ptr` methods, you need to first obtain a *raw pointer* to
-the data you want to initialize. It is illegal to construct a *reference* to
-uninitialized data, which implies that you have to be careful when obtaining
-said raw pointer:
+`ptr` のメソッドを使うには、まず初期化したいデータへの*生ポインタ*を取得する必要があることに注意してください。未初期化データへの*参照*を作ることは不正です。そのため、生ポインタの取得には注意が必要です。
 
-* For an array of `T`, you can use `base_ptr.add(idx)` where `base_ptr: *mut T`
-to compute the address of array index `idx`. This relies on
-how arrays are laid out in memory.
-* For a struct, however, in general we do not know how it is laid out, and we
-also cannot use `&mut base_ptr.field` as that would be creating a
-reference. So, you must carefully use the [raw reference][raw_reference] syntax. This creates
-a raw pointer to the field without creating an intermediate reference:
+* `T` の配列では、`base_ptr: *mut T` に対して `base_ptr.add(idx)` を使い、配列のインデックス `idx` のアドレスを計算できます。これは、メモリ上での配列のレイアウトに依存しています。
+* しかし、構造体では一般にレイアウトが分かりません。また、`&mut base_ptr.field` は参照を作ってしまうため使えません。そのため、[生参照][raw_reference]の構文を注意深く使わなければなりません。これなら中間の参照を作らずに、フィールドへの生ポインタを作れます。
 
 ```rust
 use std::{ptr, mem::MaybeUninit};
@@ -142,16 +94,9 @@ unsafe { f1_ptr.write(true); }
 let init = unsafe { uninit.assume_init() };
 ```
 
-One last remark: when reading old Rust code, you might stumble upon the
-deprecated `mem::uninitialized` function.  That function used to be the only way
-to deal with uninitialized memory on the stack, but it turned out to be
-impossible to properly integrate with the rest of the language.  Always use
-`MaybeUninit` instead in new code, and port old code over when you get the
-opportunity.
+最後に1つ注意しておきます。古い Rust コードを読むと、非推奨の `mem::uninitialized` 関数に出会うかもしれません。この関数はかつて、スタック上の未初期化メモリを扱う唯一の方法でしたが、言語の他の部分と適切に統合することは不可能だと分かりました。新しいコードでは常に代わりに `MaybeUninit` を使い、機会があれば古いコードも移行してください。
 
-And that's about it for working with uninitialized memory! Basically nothing
-anywhere expects to be handed uninitialized memory, so if you're going to pass
-it around at all, be sure to be *really* careful.
+未初期化メモリの扱いについては、だいたい以上です！ 基本的に、どこでも何も未初期化メモリを渡されるとは想定していません。そのため、それを受け渡すのであれば、必ず*本当に*注意深く行ってください。
 
 [`MaybeUninit`]: ../core/mem/union.MaybeUninit.html
 [`ptr`]: ../core/ptr/index.html

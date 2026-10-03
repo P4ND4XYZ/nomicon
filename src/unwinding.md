@@ -1,51 +1,26 @@
-# Unwinding
+<a id="unwinding"></a>
 
-Rust has a *tiered* error-handling scheme:
+# 巻き戻し
 
-* If something might reasonably be absent, Option is used.
-* If something goes wrong and can reasonably be handled, Result is used.
-* If something goes wrong and cannot reasonably be handled, the thread panics.
-* If something catastrophic happens, the program aborts.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-Option and Result are overwhelmingly preferred in most situations, especially
-since they can be promoted into a panic or abort at the API user's discretion.
-Panics cause the thread to halt normal execution and unwind its stack, calling
-destructors as if every function instantly returned.
+Rust には*階層的な*エラー処理の仕組みがあります。
 
-As of 1.0, Rust is of two minds when it comes to panics. In the long-long-ago,
-Rust was much more like Erlang. Like Erlang, Rust had lightweight tasks,
-and tasks were intended to kill themselves with a panic when they reached an
-untenable state. Unlike an exception in Java or C++, a panic could not be
-caught at any time. Panics could only be caught by the owner of the task, at which
-point they had to be handled or *that* task would itself panic.
+* 何かが存在しないことが合理的に考えられる場合、Option を使います。
+* 何か問題が起こり、合理的に対処できる場合、Result を使います。
+* 何か問題が起こり、合理的に対処できない場合、スレッドがパニックします。
+* 何か壊滅的なことが起こった場合、プログラムがアボートします。
 
-Unwinding was important to this story because if a task's
-destructors weren't called, it would cause memory and other system resources to
-leak. Since tasks were expected to die during normal execution, this would make
-Rust very poor for long-running systems!
+ほとんどの状況では、Option と Result が圧倒的に好まれます。特に、API 利用者の裁量でパニックやアボートに引き上げることができるからです。パニックはスレッドの通常の実行を停止し、そのスタックを巻き戻して、すべての関数が即座にリターンしたかのようにデストラクタを呼びます。
 
-As the Rust we know today came to be, this style of programming grew out of
-fashion in the push for less-and-less abstraction. Light-weight tasks were
-killed in the name of heavy-weight OS threads. Still, on stable Rust as of 1.0
-panics can only be caught by the parent thread. This means catching a panic
-requires spinning up an entire OS thread! This unfortunately stands in conflict
-to Rust's philosophy of zero-cost abstractions.
+1.0 の時点では、Rust はパニックについて2つの考えの間で揺れています。はるか昔、Rust はずっと Erlang に似ていました。Erlang と同様、Rust には軽量なタスクがあり、タスクは維持できない状態に達したときにパニックで自身を終了させることを意図していました。Java や C++ の例外とは異なり、パニックはいつでも捕捉できるわけではありませんでした。パニックを捕捉できるのはタスクの所有者だけで、その時点で対処しなければ、*その*タスク自体がパニックすることになっていました。
 
-There is an API called [`catch_unwind`] that enables catching a panic
-without spawning a thread. Still, we would encourage you to only do this
-sparingly. In particular, Rust's current unwinding implementation is heavily
-optimized for the "doesn't unwind" case. If a program doesn't unwind, there
-should be no runtime cost for the program being *ready* to unwind. As a
-consequence, actually unwinding will be more expensive than in e.g. Java.
-Don't build your programs to unwind under normal circumstances. Ideally, you
-should only panic for programming errors or *extreme* problems.
+この仕組みでは巻き戻しが重要でした。タスクのデストラクタが呼ばれなければ、メモリやほかのシステムリソースがリークするからです。通常の実行中にもタスクが終了することを想定していたため、そうなれば Rust は長時間稼働するシステムに非常に不向きになってしまいます！
 
-Rust's unwinding strategy is not specified to be fundamentally compatible
-with any other language's unwinding. As such, unwinding into Rust from another
-language, or unwinding into another language from Rust is Undefined Behavior.
-You must *absolutely* catch any panics at the FFI boundary! What you do at that
-point is up to you, but *something* must be done. If you fail to do this,
-at best, your application will crash and burn. At worst, your application *won't*
-crash and burn, and will proceed with completely clobbered state.
+今日知られている Rust が形になるにつれ、抽象化をますます減らそうという動きの中で、このプログラミングスタイルは廃れていきました。軽量なタスクは、重量級の OS スレッドの名の下に廃止されました。それでも、1.0 時点の安定版 Rust では、パニックを捕捉できるのは親スレッドだけです。つまり、パニックを捕捉するには OS スレッドを丸ごと1つ起動する必要があります！ 残念ながら、これは Rust のゼロコスト抽象化という哲学と矛盾します。
+
+[`catch_unwind`] という API があり、スレッドを生成せずにパニックを捕捉できます。それでも、これは控えめに使うことをお勧めします。特に、Rust の現在の巻き戻し実装は、「巻き戻さない」場合に対して高度に最適化されています。プログラムが巻き戻さなければ、巻き戻す*準備ができている*ことによる実行時コストはないはずです。その結果、実際の巻き戻しは、たとえば Java よりも高コストになります。通常の状況で巻き戻すようにプログラムを作らないでください。理想的には、プログラミング上の誤りや*極端な*問題に対してのみパニックすべきです。
+
+Rust の巻き戻し戦略は、ほかのどの言語の巻き戻しとも根本的に互換性があるとは規定されていません。そのため、ほかの言語から Rust へ巻き戻すことや、Rust からほかの言語へ巻き戻すことは未定義動作です。FFI 境界では、あらゆるパニックを*絶対に*捕捉しなければなりません！ その時点で何をするかは自由ですが、*何か*を行う必要があります。これを怠ると、よくてもアプリケーションはクラッシュして破綻します。最悪の場合、アプリケーションはクラッシュして破綻*せず*、完全に壊れた状態で処理を続けます。
 
 [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html

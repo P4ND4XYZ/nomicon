@@ -1,12 +1,10 @@
-# Drop Check
+<a id="drop-check"></a>
 
-We have seen how lifetimes provide us some fairly simple rules for ensuring
-that we never read dangling references. However up to this point we have only ever
-interacted with the _outlives_ relationship in an inclusive manner. That is,
-when we talked about `'a: 'b`, it was ok for `'a` to live _exactly_ as long as
-`'b`. At first glance, this seems to be a meaningless distinction. Nothing ever
-gets dropped at the same time as another, right? This is why we used the
-following desugaring of `let` statements:
+# ドロップチェック
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+ライフタイムによって、ダングリング参照を決して読まないための、比較的単純な規則が得られることを見てきました。しかし、ここまでは、同じ長さを含む意味での*長く存続する*という関係しか扱っていませんでした。つまり、`'a: 'b` について話したとき、`'a` は `'b` と*まったく同じ長さだけ*存続しても構いませんでした。一見すると、これは意味のない区別に思えます。あるものが別のものと同時にドロップされることなどありませんよね。そのため、`let` 文を次のように脱糖していました。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -14,7 +12,7 @@ let x;
 let y;
 ```
 
-desugaring to:
+これは次のように脱糖されます。
 
 <!-- ignore: desugared code -->
 ```rust,ignore
@@ -26,27 +24,18 @@ desugaring to:
 }
 ```
 
-There are some more complex situations which are not possible to desugar using
-scopes, but the order is still defined ‒ variables are dropped in the reverse
-order of their definition, fields of structs and tuples in order of their
-definition. There are some more details about order of drop in [RFC 1857][rfc1857].
+スコープを使って脱糖できない、より複雑な状況もありますが、順序はそれでも定義されています。変数は定義と逆の順序で、構造体とタプルのフィールドは定義された順序でドロップされます。ドロップ順序の詳細は [RFC 1857][rfc1857] にあります。
 
-Let's do this:
+次のようにしてみましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 let tuple = (vec![], vec![]);
 ```
 
-The left vector is dropped first. But does it mean the right one strictly
-outlives it in the eyes of the borrow checker? The answer to this question is
-_no_. The borrow checker could track fields of tuples separately, but it would
-still be unable to decide what outlives what in case of vector elements, which
-are dropped manually via pure-library code the borrow checker doesn't
-understand.
+左のベクタが先にドロップされます。しかし、これは借用チェッカーから見て、右のベクタが左のベクタより厳密に長く存続するという意味でしょうか。答えは*いいえ*です。借用チェッカーがタプルのフィールドを個別に追跡できたとしても、ベクタの要素では、どれがどれより長く存続するかを判断できません。要素は、借用チェッカーが理解しない、純粋にライブラリ側のコードによって手動でドロップされるからです。
 
-So why do we care? We care because if the type system isn't careful, it could
-accidentally make dangling pointers. Consider the following simple program:
+なぜこれが重要なのでしょうか。型システムが注意しないと、誤ってダングリングポインタを作りかねないからです。次の単純なプログラムを考えてみましょう。
 
 ```rust
 struct Inspector<'a>(&'a u8);
@@ -65,11 +54,9 @@ fn main() {
 }
 ```
 
-This program is totally sound and compiles today. The fact that `days` does not
-strictly outlive `inspector` doesn't matter. As long as the `inspector` is
-alive, so is `days`.
+このプログラムは完全に健全で、現在の Rust でコンパイルできます。`days` が `inspector` より厳密に長く存続しないことは問題になりません。`inspector` が生存している間は、`days` も生存しているからです。
 
-However if we add a destructor, the program will no longer compile!
+しかし、デストラクタを追加すると、このプログラムはコンパイルできなくなります！
 
 ```rust,compile_fail
 struct Inspector<'a>(&'a u8);
@@ -91,8 +78,8 @@ fn main() {
         days: Box::new(1),
     };
     world.inspector = Some(Inspector(&world.days));
-    // Let's say `days` happens to get dropped first.
-    // Then when Inspector is dropped, it will try to read free'd memory!
+    // `days` が先にドロップされるとしましょう。
+    // すると Inspector のドロップ時に、解放済みメモリを読もうとします！
 }
 ```
 
@@ -110,37 +97,19 @@ error[E0597]: `world.days` does not live long enough
    | borrow might be used here, when `world` is dropped and runs the destructor for type `World<'_>`
 ```
 
-You can try changing the order of fields or use a tuple instead of the struct,
-it'll still not compile.
+フィールドの順序を変えたり、構造体の代わりにタプルを使ったりしても、やはりコンパイルできません。
 
-Implementing `Drop` lets the `Inspector` execute some arbitrary code during its
-death. This means it can potentially observe that types that are supposed to
-live as long as it does actually were destroyed first.
+`Drop` を実装すると、`Inspector` は消滅するときに任意のコードを実行できます。そのため、自分と同じ長さだけ存続するはずの型が、実際には先に破棄されたことを観測できる可能性があります。
 
-Interestingly, only generic types need to worry about this. If they aren't
-generic, then the only lifetimes they can harbor are `'static`, which will truly
-live _forever_. This is why this problem is referred to as _sound generic drop_.
-Sound generic drop is enforced by the _drop checker_. As of this writing, some
-of the finer details of how the drop checker (also called dropck) validates
-types is totally up in the air. However The Big Rule is the subtlety that we
-have focused on this whole section:
+興味深いことに、これを心配する必要があるのはジェネリック型だけです。ジェネリックでなければ、内包できるライフタイムは、本当に*永遠に*存続する `'static` だけだからです。このため、この問題は*健全なジェネリックドロップ*と呼ばれます。健全なジェネリックドロップは、*ドロップチェッカー*によって強制されます。本書の執筆時点では、ドロップチェッカー（dropck とも呼ばれます）が型を検証する方法の細部には、まだまったく定まっていないものがあります。しかし、重要な規則は、この節全体で注目してきた微妙な点です。
 
-**For a generic type to soundly implement drop, its generics arguments must
-strictly outlive it.**
+**ジェネリック型が健全にドロップを実装するには、ジェネリック引数が、その型より厳密に長く存続しなければなりません。**
 
-Obeying this rule is (usually) necessary to satisfy the borrow
-checker; obeying it is sufficient but not necessary to be
-sound. That is, if your type obeys this rule then it's definitely
-sound to drop.
+この規則に従うことは、借用チェッカーを満足させるためには（通常）必要です。一方、健全性に対しては十分条件ですが、必要条件ではありません。つまり、型がこの規則に従っていれば、その型をドロップすることは確実に健全です。
 
-The reason that it is not always necessary to satisfy the above rule
-is that some Drop implementations will not access borrowed data even
-though their type gives them the capability for such access, or because we know
-the specific drop order and the borrowed data is still fine even if the borrow
-checker doesn't know that.
+この規則に従うことが常に必要とは限らないのは、型としてはアクセスできても、借用データにアクセスしない `Drop` 実装があるからです。また、借用チェッカーは知らなくても、具体的なドロップ順序が分かっていて、借用データが依然として有効な場合もあります。
 
-For example, this variant of the above `Inspector` example will never
-access borrowed data:
+たとえば、先ほどの `Inspector` の次の変形例は、借用データに決してアクセスしません。
 
 ```rust,compile_fail
 struct Inspector<'a>(&'a u8, &'static str);
@@ -162,13 +131,13 @@ fn main() {
         days: Box::new(1),
     };
     world.inspector = Some(Inspector(&world.days, "gadget"));
-    // Let's say `days` happens to get dropped first.
-    // Even when Inspector is dropped, its destructor will not access the
-    // borrowed `days`.
+    // `days` が先にドロップされるとしましょう。
+    // Inspector がドロップされても、そのデストラクタは
+    // 借用した `days` にアクセスしません。
 }
 ```
 
-Likewise, this variant will also never access borrowed data:
+同様に、次の変形例も借用データに決してアクセスしません。
 
 ```rust,compile_fail
 struct Inspector<T>(T, &'static str);
@@ -190,44 +159,31 @@ fn main() {
         days: Box::new(1),
     };
     world.inspector = Some(Inspector(&world.days, "gadget"));
-    // Let's say `days` happens to get dropped first.
-    // Even when Inspector is dropped, its destructor will not access the
-    // borrowed `days`.
+    // `days` が先にドロップされるとしましょう。
+    // Inspector がドロップされても、そのデストラクタは
+    // 借用した `days` にアクセスしません。
 }
 ```
 
-However, _both_ of the above variants are rejected by the borrow
-checker during the analysis of `fn main`, saying that `days` does not
-live long enough.
+しかし、上の*両方*の変形例は、`fn main` の解析中に借用チェッカーから拒否されます。`days` が十分に長く存続しないと言われるのです。
 
-The reason is that the borrow checking analysis of `main` does not
-know about the internals of each `Inspector`'s `Drop` implementation. As
-far as the borrow checker knows while it is analyzing `main`, the body
-of an inspector's destructor might access that borrowed data.
+これは、`main` の借用検査の解析が、それぞれの `Inspector` の `Drop` 実装の内部を知らないためです。`main` を解析する借用チェッカーに分かる範囲では、`Inspector` のデストラクタの本体が、その借用データにアクセスする可能性があります。
 
-Therefore, the drop checker forces all borrowed data in a value to
-strictly outlive that value.
+そのため、ドロップチェッカーは、値の中のすべての借用データが、その値より厳密に長く存続することを要求します。
 
-## An Escape Hatch
+<a id="an-escape-hatch"></a>
 
-The precise rules that govern drop checking may be less restrictive in
-the future.
+## 抜け道
 
-The current analysis is deliberately conservative; it forces all
-borrowed data in a value to outlive that value, which is certainly sound.
+ドロップ検査を制御する正確な規則は、将来、制約が緩くなるかもしれません。
 
-Future versions of the language may make the analysis more precise, to
-reduce the number of cases where sound code is rejected as unsafe.
-This would help address cases such as the two `Inspector`s above that
-know not to inspect during destruction.
+現在の解析は意図的に保守的です。値の中のすべての借用データがその値より長く存続することを要求するため、確実に健全です。
 
-In the meantime, there is an unstable attribute that one can use to
-assert (unsafely) that a generic type's destructor is _guaranteed_ to
-not access any expired data, even if its type gives it the capability
-to do so.
+言語の将来のバージョンでは解析がより精密になり、健全なコードが安全でないとして拒否されるケースを減らせるかもしれません。これは、破棄時には調べるべきでないと分かっている、上の2つの `Inspector` のようなケースへの対処に役立ちます。
 
-That attribute is called `may_dangle` and was introduced in [RFC 1327][rfc1327].
-To deploy it on the `Inspector` from above, we would write:
+その間は、不安定な属性を使って、ジェネリック型のデストラクタが、型としては可能でも、期限切れのデータには決してアクセスしないと*保証*することを、アンセーフに表明できます。
+
+この属性は `may_dangle` と呼ばれ、[RFC 1327][rfc1327] で導入されました。先ほどの `Inspector` に適用するには、次のように書きます。
 
 ```rust
 #![feature(dropck_eyepatch)]
@@ -254,15 +210,9 @@ fn main() {
 }
 ```
 
-Use of this attribute requires the `Drop` impl to be marked `unsafe` because the
-compiler is not checking the implicit assertion that no potentially expired data
-(e.g. `self.0` above) is accessed.
+この属性を使うには、`Drop` の実装に `unsafe` を付ける必要があります。期限切れかもしれないデータ（たとえば上の `self.0`）にアクセスしないという暗黙の表明を、コンパイラは検査しないからです。
 
-The attribute can be applied to any number of lifetime and type parameters. In
-the following example, we assert that we access no data behind a reference of
-lifetime `'b` and that the only uses of `T` will be moves or drops, but omit
-the attribute from `'a` and `U`, because we do access data with that lifetime
-and that type:
+この属性は、任意の数のライフタイムパラメータと型パラメータに適用できます。次の例では、ライフタイム `'b` の参照の背後にあるデータにアクセスせず、`T` はムーブまたはドロップにしか使わないと表明しています。一方、`'a` と `U` には属性を付けません。そのライフタイムと型のデータにはアクセスするからです。
 
 ```rust
 #![feature(dropck_eyepatch)]
@@ -277,31 +227,28 @@ unsafe impl<'a, #[may_dangle] 'b, #[may_dangle] T, U: Display> Drop for Inspecto
 }
 ```
 
-It is sometimes obvious that no such access can occur, like the case above.
-However, when dealing with a generic type parameter, such access can
-occur indirectly. Examples of such indirect access are:
+上の例のように、そのようなアクセスが起こらないことが明らかな場合もあります。しかし、ジェネリック型パラメータを扱うときには、間接的にアクセスが起こることがあります。たとえば、次のような間接アクセスです。
 
-- invoking a callback,
-- via a trait method call.
+- コールバックの呼び出し
+- トレイトメソッドの呼び出しを介したアクセス
 
-(Future changes to the language, such as impl specialization, may add
-other avenues for such indirect access.)
+（実装の特殊化など、言語の将来の変更によって、そのような間接アクセスの経路がほかにも増える可能性があります。）
 
-Here is an example of invoking a callback:
+コールバックを呼び出す例を示します。
 
 ```rust
 struct Inspector<T>(T, &'static str, Box<for <'r> fn(&'r T) -> String>);
 
 impl<T> Drop for Inspector<T> {
     fn drop(&mut self) {
-        // The `self.2` call could access a borrow e.g. if `T` is `&'a _`.
+        // `self.2` の呼び出しは、たとえば `T` が `&'a _` なら、借用にアクセスし得ます。
         println!("Inspector({}, {}) unwittingly inspects expired data.",
                  (self.2)(&self.0), self.1);
     }
 }
 ```
 
-Here is an example of a trait method call:
+トレイトメソッドを呼び出す例を示します。
 
 ```rust
 use std::fmt;
@@ -310,36 +257,29 @@ struct Inspector<T: fmt::Display>(T, &'static str);
 
 impl<T: fmt::Display> Drop for Inspector<T> {
     fn drop(&mut self) {
-        // There is a hidden call to `<T as Display>::fmt` below, which
-        // could access a borrow e.g. if `T` is `&'a _`
+        // 下には `<T as Display>::fmt` の隠れた呼び出しがあります。
+        // たとえば `T` が `&'a _` なら、借用にアクセスし得ます。
         println!("Inspector({}, {}) unwittingly inspects expired data.",
                  self.0, self.1);
     }
 }
 ```
 
-And of course, all of these accesses could be further hidden within
-some other method invoked by the destructor, rather than being written
-directly within it.
+もちろん、これらのアクセスはすべて、デストラクタ内に直接書かれるのではなく、デストラクタが呼び出す別のメソッドの内部にさらに隠れている可能性もあります。
 
-In all of the above cases where the `&'a u8` is accessed in the
-destructor, adding the `#[may_dangle]`
-attribute makes the type vulnerable to misuse that the borrow
-checker will not catch, inviting havoc. It is better to avoid adding
-the attribute.
+上の、デストラクタ内で `&'a u8` にアクセスするすべてのケースで、`#[may_dangle]` 属性を追加すると、借用チェッカーが検出できない誤用に対して型が脆弱になり、大混乱を招きます。この属性の追加は避けたほうがよいでしょう。
 
-## A related side note about drop order
+<a id="a-related-side-note-about-drop-order"></a>
 
-While the drop order of fields inside a struct is defined, relying on it is
-fragile and subtle. When the order matters, it is better to use the
-[`ManuallyDrop`] wrapper.
+## ドロップ順序に関する補足
 
-## Is that all about drop checker?
+構造体内のフィールドのドロップ順序は定義されていますが、それに依存するのは壊れやすく、微妙です。順序が重要な場合は、[`ManuallyDrop`] ラッパーを使うほうがよいでしょう。
 
-It turns out that when writing unsafe code, we generally don't need to
-worry at all about doing the right thing for the drop checker. However there
-is one special case that you need to worry about, which we will look at in
-the next section.
+<a id="is-that-all-about-drop-checker"></a>
+
+## ドロップチェッカーについてはこれで全部でしょうか？
+
+実のところ、アンセーフなコードを書くとき、一般にはドロップチェッカーに対して正しい対応をすることを、まったく心配する必要はありません。ただし、注意しなければならない特別なケースが1つあります。次の節ではそれを見ていきます。
 
 [rfc1327]: https://github.com/rust-lang/rfcs/blob/master/text/1327-dropck-param-eyepatch.md
 [rfc1857]: https://github.com/rust-lang/rfcs/blob/master/text/1857-stabilize-drop-order.md

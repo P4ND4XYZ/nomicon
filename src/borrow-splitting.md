@@ -1,10 +1,10 @@
-# Splitting Borrows
+<a id="splitting-borrows"></a>
 
-The mutual exclusion property of mutable references can be very limiting when
-working with a composite structure. The borrow checker (a.k.a. borrowck)
-understands some basic stuff, but will fall over pretty easily. It does
-understand structs sufficiently to know that it's possible to borrow disjoint
-fields of a struct simultaneously. So this works today:
+# 借用の分割
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+複合構造を扱うとき、可変参照の相互排他性は大きな制約になり得ます。借用チェッカー（borrowck とも呼ばれます）は、いくつかの基本的なことを理解していますが、かなり簡単に行き詰まります。ただし、構造体については、重ならないフィールドを同時に借用できると分かる程度には理解しています。したがって、次のコードは現在の Rust で動作します。
 
 ```rust
 struct Foo {
@@ -23,8 +23,7 @@ let c2 = &x.c;
 println!("{} {} {} {}", a, b, c, c2);
 ```
 
-However borrowck doesn't understand arrays or slices in any way, so this doesn't
-work:
+しかし、借用チェッカーは配列やスライスについてはまったく理解していないため、次のコードは動作しません。
 
 ```rust,compile_fail
 let mut x = [1, 2, 3];
@@ -48,17 +47,9 @@ error[E0499]: cannot borrow `x[..]` as mutable more than once at a time
 error: aborting due to previous error
 ```
 
-While it was plausible that borrowck could understand this simple case, it's
-pretty clearly hopeless for borrowck to understand disjointness in general
-container types like a tree, especially if distinct keys actually *do* map
-to the same value.
+この単純なケースなら借用チェッカーが理解できてもよさそうですが、木のような一般的なコンテナ型で、領域が重ならないことを理解するのは、明らかに望み薄です。特に、異なるキーが実際に同じ値に*対応する*場合はそうです。
 
-In order to "teach" borrowck that what we're doing is ok, we need to drop down
-to unsafe code. For instance, mutable slices expose a `split_at_mut` function
-that consumes the slice and returns two mutable slices. One for everything to
-the left of the index, and one for everything to the right. Intuitively we know
-this is safe because the slices don't overlap, and therefore alias. However
-the implementation requires some unsafety:
+していることに問題がないと借用チェッカーに「教える」には、アンセーフなコードに降りる必要があります。たとえば、可変スライスは、スライスを消費して2つの可変スライスを返す `split_at_mut` 関数を公開しています。1つはインデックスより左側のすべて、もう1つは右側のすべてを表します。これらのスライスは重ならず、したがってエイリアシングも起こらないので、安全だと直感的に分かります。しかし、実装にはアンセーフな操作が必要です。
 
 ```rust
 # use std::slice::from_raw_parts_mut;
@@ -80,11 +71,9 @@ pub fn split_at_mut(&mut self, mid: usize) -> (&mut [T], &mut [T]) {
 # }
 ```
 
-This is actually a bit subtle. So as to avoid ever making two `&mut`'s to the
-same value, we explicitly construct brand-new slices through raw pointers.
+これは実際、少し微妙です。同じ値への2つの `&mut` を決して作らないように、生ポインタを介して、まったく新しいスライスを明示的に構築します。
 
-However more subtle is how iterators that yield mutable references work.
-The iterator trait is defined as follows:
+しかし、もっと微妙なのは、可変参照を返すイテレータがどう動くかです。イテレータのトレイトは、次のように定義されます。
 
 ```rust
 trait Iterator {
@@ -94,25 +83,15 @@ trait Iterator {
 }
 ```
 
-Given this definition, Self::Item has *no* connection to `self`. This means that
-we can call `next` several times in a row, and hold onto all the results
-*concurrently*. This is perfectly fine for by-value iterators, which have
-exactly these semantics. It's also actually fine for shared references, as they
-admit arbitrarily many references to the same thing (although the iterator needs
-to be a separate object from the thing being shared).
+この定義では、`Self::Item` は `self` と*何の*つながりも持ちません。つまり、`next` を続けて何度も呼び出し、その結果をすべて*同時に*保持できます。値を返すイテレータでは、まさにこの意味論を持つため、まったく問題ありません。共有参照でも、同じものへの任意の数の参照を認めるので、実際には問題ありません（ただし、イテレータは共有されるものとは別のオブジェクトである必要があります）。
 
-But mutable references make this a mess. At first glance, they might seem
-completely incompatible with this API, as it would produce multiple mutable
-references to the same object!
+しかし、可変参照では話が複雑になります。一見すると、この API は同じオブジェクトへの可変参照を複数生成してしまうため、可変参照とはまったく両立しないように思えるかもしれません！
 
-However it actually *does* work, exactly because iterators are one-shot objects.
-Everything an IterMut yields will be yielded at most once, so we don't
-actually ever yield multiple mutable references to the same piece of data.
+しかし、実際には*動作します*。まさに、イテレータが一度きりのオブジェクトだからです。`IterMut` が返すものはどれも、高々1回しか返されません。そのため、同じデータへの可変参照を複数返すことは、実際には決してありません。
 
-Perhaps surprisingly, mutable iterators don't require unsafe code to be
-implemented for many types!
+驚くかもしれませんが、多くの型では、可変イテレータの実装にアンセーフなコードは必要ありません！
 
-For instance here's a singly linked list:
+たとえば、次は単方向連結リストです。
 
 ```rust
 # fn main() {}
@@ -147,7 +126,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 }
 ```
 
-Here's a mutable slice:
+次は可変スライスです。
 
 ```rust
 # fn main() {}
@@ -181,7 +160,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 }
 ```
 
-And here's a binary tree:
+そして、次は二分木です。
 
 ```rust
 # fn main() {}
@@ -286,8 +265,4 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 }
 ```
 
-All of these are completely safe and work on stable Rust! This ultimately
-falls out of the simple struct case we saw before: Rust understands that you
-can safely split a mutable reference into subfields. We can then encode
-permanently consuming a reference via Options (or in the case of slices,
-replacing with an empty slice).
+これらはすべて完全に安全で、安定版の Rust で動作します！これは結局、先ほど見た単純な構造体のケースから導かれます。Rust は、可変参照を内部のフィールドへの参照に安全に分割できると理解しているのです。そのうえで、`Option` を介して（スライスの場合は空のスライスで置き換えて）、参照を恒久的に消費することを表現できます。

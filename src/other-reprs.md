@@ -1,4 +1,8 @@
+<a id="alternative-representations"></a>
+
 # 代替表現
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
 Rust では、デフォルトとは異なるデータレイアウト戦略を指定できます。
 
@@ -26,7 +30,7 @@ FFI 境界の管理には、[rust-bindgen] や [cbindgen] を使うことを強�
 
 ## repr(transparent)
 
-`#[repr(transparent)]` は、サイズが0でないフィールドを1つだけ持つ構造体、またはバリアントが1つだけの enum に使えます（サイズ0のフィールドは追加しても構いません）。この属性により、構造体／enum 全体のレイアウトと ABI が、その唯一のフィールドと同じであることが保証されます。
+`#[repr(transparent)]` は、サイズが0でないフィールドを1つだけ持つ構造体、またはバリアントが1つだけでサイズが0でないフィールドを1つだけ持つ enum にのみ使えます（サイズ0のフィールドは追加しても構いません）。この属性により、構造体／enum 全体のレイアウトと ABI が、その唯一のフィールドと同じであることが保証されます。
 
 > 注: union に `repr(transparent)` を適用する nightly 機能 `transparent_unions` がありますが、設計上の懸念から安定化されていません。詳しくは[追跡 issue][issue-60405]を参照してください。
 

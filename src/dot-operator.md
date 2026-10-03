@@ -1,61 +1,50 @@
-# The Dot Operator
+<a id="the-dot-operator"></a>
 
-The dot operator will perform a lot of magic to convert types.
-It will perform auto-referencing, auto-dereferencing, and coercion until types
-match.
-The detailed mechanics of method lookup are defined [here][method_lookup],
-but here is a brief overview that outlines the main steps.
+# ドット演算子
 
-Suppose we have a function `foo` that has a receiver (a `self`, `&self` or
-`&mut self` parameter).
-If we call `value.foo()`, the compiler needs to determine what type `Self` is before
-it can call the correct implementation of the function.
-For this example, we will say that `value` has type `T`.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-We will use [fully-qualified syntax][fqs] to be more clear about exactly which
-type we are calling a function on.
+ドット演算子は型を変換するために多くの魔法を使います。
+型が一致するまで、自動参照、自動参照外し、強制変換を行います。
+メソッド探索の詳しい仕組みは[こちら][method_lookup]に定義されていますが、ここでは主要な手順を簡単に説明します。
 
-- First, the compiler checks if it can call `T::foo(value)` directly.
-This is called a "by value" method call.
-- If it can't call this function (for example, if the function has the wrong type
-or a trait isn't implemented for `Self`), then the compiler tries to add in an
-automatic reference.
-This means that the compiler tries `<&T>::foo(value)` and `<&mut T>::foo(value)`.
-This is called an "autoref" method call.
-- If none of these candidates worked, it dereferences `T` and tries again.
-This uses the `Deref` trait - if `T: Deref<Target = U>` then it tries again with
-type `U` instead of `T`.
-If it can't dereference `T`, it can also try _unsizing_ `T`.
-This just means that if `T` has a size parameter known at compile time, it "forgets"
-it for the purpose of resolving methods.
-For instance, this unsizing step can convert `[i32; 2]` into `[i32]` by "forgetting"
-the size of the array.
+レシーバ（`self`、`&self`、または `&mut self` パラメータ）を持つ関数 `foo` があるとします。
+`value.foo()` を呼び出すと、コンパイラは関数の正しい実装を呼び出す前に、`Self` がどの型かを決定する必要があります。
+この例では、`value` の型を `T` とします。
 
-Here is an example of the method lookup algorithm:
+どの型に対して関数を呼び出しているかを明確にするため、[完全修飾構文][fqs]を使います。
+
+- まず、コンパイラは `T::foo(value)` を直接呼び出せるか確認します。
+これは「値渡し」のメソッド呼び出しと呼ばれます。
+- この関数を呼び出せない場合（例えば、関数の型が違う場合や、`Self` にトレイトが実装されていない場合）、コンパイラは自動的に参照を追加しようとします。
+つまり、`<&T>::foo(value)` と `<&mut T>::foo(value)` を試します。
+これは「autoref」のメソッド呼び出しと呼ばれます。
+- これらの候補がどれもうまくいかなければ、`T` を参照外しして再び試します。
+ここでは `Deref` トレイトを使います。`T: Deref<Target = U>` なら、`T` の代わりに型 `U` で再び試します。
+`T` を参照外しできなければ、`T` の_アンサイズ化_を試すこともできます。
+これは単に、`T` にコンパイル時に既知のサイズパラメータがある場合、メソッドを解決するためにそれを「忘れる」ということです。
+例えば、このアンサイズ化の手順では、配列のサイズを「忘れる」ことで `[i32; 2]` を `[i32]` に変換できます。
+
+メソッド探索アルゴリズムの例を見てみましょう。
 
 ```rust,ignore
 let array: Rc<Box<[T; 3]>> = ...;
 let first_entry = array[0];
 ```
 
-How does the compiler actually compute `array[0]` when the array is behind so
-many indirections?
-First, `array[0]` is really just syntax sugar for the [`Index`][index] trait -
-the compiler will convert `array[0]` into `array.index(0)`.
-Now, the compiler checks to see if `array` implements `Index`, so that it can call
-the function.
+配列がこれほど多くの間接参照の奥にあるとき、コンパイラは実際にどうやって `array[0]` を計算するのでしょうか？
+まず、`array[0]` は実際には [`Index`][index] トレイトのシンタックスシュガーにすぎません。
+コンパイラは `array[0]` を `array.index(0)` に変換します。
+そして、関数を呼び出せるように、`array` が `Index` を実装しているか確認します。
 
-Then, the compiler checks if `Rc<Box<[T; 3]>>` implements `Index`, but it
-does not, and neither do `&Rc<Box<[T; 3]>>` or `&mut Rc<Box<[T; 3]>>`.
-Since none of these worked, the compiler dereferences the `Rc<Box<[T; 3]>>` into
-`Box<[T; 3]>` and tries again.
-`Box<[T; 3]>`, `&Box<[T; 3]>`, and `&mut Box<[T; 3]>` do not implement `Index`,
-so it dereferences again.
-`[T; 3]` and its autorefs also do not implement `Index`.
-It can't dereference `[T; 3]`, so the compiler unsizes it, giving `[T]`.
-Finally, `[T]` implements `Index`, so it can now call the actual `index` function.
+そこでコンパイラは `Rc<Box<[T; 3]>>` が `Index` を実装しているか確認しますが、実装していません。`&Rc<Box<[T; 3]>>` も `&mut Rc<Box<[T; 3]>>` も同様です。
+どれもうまくいかなかったので、コンパイラは `Rc<Box<[T; 3]>>` を参照外しして `Box<[T; 3]>` にし、再び試します。
+`Box<[T; 3]>`、`&Box<[T; 3]>`、`&mut Box<[T; 3]>` は `Index` を実装していないので、さらに参照外しします。
+`[T; 3]` とその自動参照も `Index` を実装していません。
+`[T; 3]` は参照外しできないので、コンパイラはアンサイズ化して `[T]` にします。
+ついに `[T]` は `Index` を実装しているので、実際の `index` 関数を呼び出せます。
 
-Consider the following more complicated example of the dot operator at work:
+ドット演算子が働く、次のより複雑な例を考えてみましょう。
 
 ```rust
 fn do_stuff<T: Clone>(value: &T) {
@@ -63,21 +52,17 @@ fn do_stuff<T: Clone>(value: &T) {
 }
 ```
 
-What type is `cloned`?
-First, the compiler checks if it can call by value.
-The type of `value` is `&T`, and so the `clone` function has signature
-`fn clone(&T) -> T`.
-It knows that `T: Clone`, so the compiler finds that `cloned: T`.
+`cloned` はどの型でしょうか？
+まず、コンパイラは値渡しで呼び出せるか確認します。
+`value` の型は `&T` なので、`clone` 関数のシグネチャは `fn clone(&T) -> T` です。
+`T: Clone` であることが分かっているので、コンパイラは `cloned: T` と判断します。
 
-What would happen if the `T: Clone` restriction was removed? It would not be able
-to call by value, since there is no implementation of `Clone` for `T`.
-So the compiler tries to call by autoref.
-In this case, the function has the signature `fn clone(&&T) -> &T` since
-`Self = &T`.
-The compiler sees that `&T: Clone`, and then deduces that `cloned: &T`.
+`T: Clone` という制約を取り除くとどうなるでしょうか？ `T` に対する `Clone` の実装がないので、値渡しでは呼び出せません。
+そこでコンパイラは自動参照による呼び出しを試します。
+この場合、`Self = &T` なので、関数のシグネチャは `fn clone(&&T) -> &T` になります。
+コンパイラは `&T: Clone` を確認し、`cloned: &T` と推論します。
 
-Here is another example where the autoref behavior is used to create some subtle
-effects:
+自動参照の挙動が微妙な効果を生む、別の例を見てみましょう。
 
 ```rust
 # use std::sync::Arc;
@@ -91,13 +76,11 @@ fn clone_containers<T>(foo: &Container<i32>, bar: &Container<T>) {
 }
 ```
 
-What types are `foo_cloned` and `bar_cloned`?
-We know that `Container<i32>: Clone`, so the compiler calls `clone` by value to give
-`foo_cloned: Container<i32>`.
-However, `bar_cloned` actually has type `&Container<T>`.
-Surely this doesn't make sense - we added `#[derive(Clone)]` to `Container`, so it
-must implement `Clone`!
-Looking closer, the code generated by the `derive` macro is (roughly):
+`foo_cloned` と `bar_cloned` はどの型でしょうか？
+`Container<i32>: Clone` であることが分かっているので、コンパイラは値渡しで `clone` を呼び出し、`foo_cloned: Container<i32>` を得ます。
+しかし、`bar_cloned` の型は実際には `&Container<T>` です。
+これはおかしいはずです。`Container` に `#[derive(Clone)]` を追加したのですから、`Clone` を実装しているはずではないでしょうか！
+よく見ると、`derive` マクロが生成するコードは（おおよそ）次のようになります。
 
 ```rust,ignore
 impl<T> Clone for Container<T> where T: Clone {
@@ -107,13 +90,11 @@ impl<T> Clone for Container<T> where T: Clone {
 }
 ```
 
-The derived `Clone` implementation is [only defined where `T: Clone`][clone],
-so there is no implementation for `Container<T>: Clone` for a generic `T`.
-The compiler then looks to see if `&Container<T>` implements `Clone`, which it does.
-So it deduces that `clone` is called by autoref, and so `bar_cloned` has type
-`&Container<T>`.
+導出された `Clone` の実装は [`T: Clone` の場合にのみ定義される][clone]ので、一般の `T` について `Container<T>: Clone` を満たす実装はありません。
+そこでコンパイラは `&Container<T>` が `Clone` を実装しているか確認し、実装されていると分かります。
+したがって `clone` は自動参照で呼び出されると推論し、`bar_cloned` の型は `&Container<T>` になります。
 
-We can fix this by implementing `Clone` manually without requiring `T: Clone`:
+`T: Clone` を要求せずに `Clone` を手動で実装すれば、これを修正できます。
 
 ```rust,ignore
 impl<T> Clone for Container<T> {
@@ -123,7 +104,7 @@ impl<T> Clone for Container<T> {
 }
 ```
 
-Now, the type checker deduces that `bar_cloned: Container<T>`.
+これで型チェッカーは `bar_cloned: Container<T>` と推論します。
 
 [fqs]: ../book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name
 [method_lookup]: https://rustc-dev-guide.rust-lang.org/hir-typeck/method-lookup.html

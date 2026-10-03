@@ -1,8 +1,9 @@
 # Drain
 
-Let's move on to Drain. Drain is largely the same as IntoIter, except that
-instead of consuming the Vec, it borrows the Vec and leaves its allocation
-untouched. For now we'll only implement the "basic" full-range version.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
+
+Drain に進みましょう。Drain はほぼ IntoIter と同じですが、Vec を消費する代わりに
+借用し、そのアロケーションは変更しません。今は「基本的な」全範囲版だけを実装します。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -24,8 +25,8 @@ impl<'a, T> Iterator for Drain<'a, T> {
             None
 ```
 
--- wait, this is seeming familiar. Let's do some more compression. Both
-IntoIter and Drain have the exact same structure, let's just factor it out.
+-- 待ってください。見覚えがありますね。さらにまとめましょう。
+IntoIter と Drain はまったく同じ構造なので、それを切り出しましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -57,7 +58,7 @@ impl<T> RawValIter<T> {
 // Iterator and DoubleEndedIterator impls identical to IntoIter.
 ```
 
-And IntoIter becomes the following:
+IntoIter は次のようになります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -101,12 +102,12 @@ impl<T> IntoIterator for Vec<T> {
 }
 ```
 
-Note that I've left a few quirks in this design to make upgrading Drain to work
-with arbitrary subranges a bit easier. In particular we *could* have RawValIter
-drain itself on drop, but that won't work right for a more complex Drain.
-We also take a slice to simplify Drain initialization.
+Drain を任意の部分範囲で動くよう拡張しやすくするため、この設計には少し変わった点を
+残していることに注意してください。特に、RawValIter がドロップ時に自身をドレインするように
+することも*できます*が、より複雑な Drain では正しく動作しません。
+また、Drain の初期化を簡単にするため、スライスを受け取ります。
 
-Alright, now Drain is really easy:
+これで Drain の実装はとても簡単になります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -150,7 +151,6 @@ impl<T> Vec<T> {
 }
 ```
 
-For more details on the `mem::forget` problem, see the
-[section on leaks][leaks].
+`mem::forget` の問題の詳細は、[リークの節][leaks]を参照してください。
 
 [leaks]: ../leaking.html

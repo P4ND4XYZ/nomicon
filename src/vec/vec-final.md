@@ -1,4 +1,8 @@
-# The Final Code
+<a id="the-final-code"></a>
+
+# 最終的なコード
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
 ```rust
 use std::alloc::{self, Layout};

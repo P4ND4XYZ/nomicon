@@ -1,4 +1,8 @@
+<a id="data-representation-in-rust"></a>
+
 # Rust のデータ表現
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
 低レベルプログラミングでは、データレイアウトがとても重要です。大きな意味を持つ問題です。また、言語のほかの部分にも広く影響するため、まず Rust でデータがどのように表現されるかを詳しく見ていきます。
 

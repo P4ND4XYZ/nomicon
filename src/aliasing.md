@@ -1,4 +1,8 @@
+<a id="aliasing"></a>
+
 # エイリアシング
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
 まず、重要な注意点をいくつか確認しておきます。
 
@@ -7,6 +11,8 @@
 * 単一スレッドで割り込みのない実行を前提とします。また、メモリマップドハードウェアなども考慮しません。Rust は、特に指示されない限り、こうしたことは起きないものと仮定します。詳しくは[並行性の章](concurrency.html)を参照してください。
 
 ここでは、変数とポインタが重なり合うメモリ領域を指しているとき、それらは*エイリアスしている*と定義します。
+
+<a id="why-aliasing-matters"></a>
 
 ## エイリアシングが重要な理由
 

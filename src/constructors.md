@@ -1,7 +1,10 @@
-# Constructors
+<a id="constructors"></a>
 
-There is exactly one way to create an instance of a user-defined type: name it,
-and initialize all its fields at once:
+# コンストラクタ
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+ユーザー定義型のインスタンスを作成する方法は、ただ1つです。型の名前を指定し、そのすべてのフィールドを一度に初期化します。
 
 ```rust
 struct Foo {
@@ -22,38 +25,16 @@ let bar = Bar::X(0);
 let empty = Unit;
 ```
 
-That's it. Every other way you make an instance of a type is just calling a
-totally vanilla function that does some stuff and eventually bottoms out to The
-One True Constructor.
+これだけです。型のインスタンスを作るほかの方法はすべて、何らかの処理を行い、最終的にこの唯一の真のコンストラクタに行き着く、ごく普通の関数を呼んでいるだけです。
 
-Unlike C++, Rust does not come with a slew of built-in kinds of constructor.
-There are no Copy, Default, Assignment, Move, or whatever constructors. The
-reasons for this are varied, but it largely boils down to Rust's philosophy of
-*being explicit*.
+C++ と違い、Rust には多数の種類の組み込みコンストラクタはありません。コピー、デフォルト、代入、ムーブ、その他どのようなコンストラクタもありません。その理由はさまざまですが、主には Rust の*明示的であること*という哲学に帰着します。
 
-Move constructors are meaningless in Rust because we don't enable types to
-"care" about their location in memory. Every type must be ready for it to be
-blindly memcopied to somewhere else in memory. This means pure on-the-stack-but-
-still-movable intrusive linked lists are simply not happening in Rust (safely).
+Rust では、型がメモリ内の自分の位置を「気にする」ことを認めないため、ムーブコンストラクタは無意味です。どの型も、メモリ内の別の場所へ無条件にメモリコピーされることに対応していなければなりません。つまり、完全にスタック上にあり、それでもムーブ可能な侵入型連結リストは、Rust では（安全には）実現できません。
 
-Assignment and copy constructors similarly don't exist because move semantics
-are the only semantics in Rust. At most `x = y` just moves the bits of y into
-the x variable. Rust does provide two facilities for providing C++'s copy-
-oriented semantics: `Copy` and `Clone`. Clone is our moral equivalent of a copy
-constructor, but it's never implicitly invoked. You have to explicitly call
-`clone` on an element you want to be cloned. Copy is a special case of Clone
-where the implementation is just "copy the bits". Copy types *are* implicitly
-cloned whenever they're moved, but because of the definition of Copy this just
-means not treating the old copy as uninitialized -- a no-op.
+同様に、代入コンストラクタやコピーコンストラクタも存在しません。Rust にあるセマンティクスはムーブセマンティクスだけだからです。`x = y` は、せいぜい y のビットを変数 x に移すだけです。Rust は C++ のコピー指向のセマンティクスを提供するために、`Copy` と `Clone` という2つの仕組みを用意しています。Clone はコピーコンストラクタに相当するものですが、暗黙に呼び出されることは決してありません。クローンしたい要素に対して、明示的に `clone` を呼ぶ必要があります。Copy は Clone の特殊な場合で、その実装は単に「ビットをコピーする」ものです。Copy 型はムーブされるたびに暗黙にクローン*されます*が、Copy の定義により、これは古いコピーを未初期化として扱わないことを意味するだけです。つまり no-op（何もしない操作）です。
 
-While Rust provides a `Default` trait for specifying the moral equivalent of a
-default constructor, it's incredibly rare for this trait to be used. This is
-because variables [aren't implicitly initialized][uninit]. Default is basically
-only useful for generic programming. In concrete contexts, a type will provide a
-static `new` method for any kind of "default" constructor. This has no relation
-to `new` in other languages and has no special meaning. It's just a naming
-convention.
+Rust にはデフォルトコンストラクタに相当するものを指定する `Default` トレイトがありますが、このトレイトが使われることは非常にまれです。変数は[暗黙に初期化されない][uninit]からです。Default は基本的にジェネリックプログラミングでのみ役立ちます。具体的な文脈では、型はあらゆる種類の「デフォルト」コンストラクタとして静的な `new` メソッドを提供します。これはほかの言語の `new` とは無関係で、特別な意味もありません。単なる命名規則です。
 
-TODO: talk about "placement new"?
+TODO: 「placement new」について説明しますか？
 
 [uninit]: uninitialized.html

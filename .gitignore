@@ -5,3 +5,6 @@ book
 linkcheck
 linkchecker
 linkcheck.sh
+
+# Translation ledger verification tests
+scripts/__pycache__/

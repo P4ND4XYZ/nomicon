@@ -1,13 +1,14 @@
-# Implementing Arc
+<a id="implementing-arc"></a>
 
-In this section, we'll be implementing a simpler version of `std::sync::Arc`.
-Similarly to [the implementation of `Vec` we made earlier](../vec/vec.md), we won't be
-taking advantage of as many optimizations, intrinsics, or unstable code as the
-standard library may.
+# Arc の実装
 
-This implementation is loosely based on the standard library's implementation
-(technically taken from `alloc::sync` in 1.49, as that's where it's actually
-implemented), but it will not support weak references at the moment as they
-make the implementation slightly more complex.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-Please note that this section is very work-in-progress at the moment.
+この節では、`std::sync::Arc` の簡略版を実装します。
+[先ほど作った `Vec` の実装](../vec/vec.md)と同様に、標準ライブラリが利用しうるほど多くの最適化、組み込み関数、不安定なコードは利用しません。
+
+この実装は標準ライブラリの実装をおおまかに基にしています
+（正確には、実際の実装場所である 1.49 の `alloc::sync` から取っています）が、
+弱参照は実装を少し複雑にするため、現時点ではサポートしません。
+
+この節は現在、まだかなり執筆途中であることに注意してください。

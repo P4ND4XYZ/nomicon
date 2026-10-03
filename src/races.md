@@ -1,33 +1,24 @@
-# Data Races and Race Conditions
+<a id="data-races-and-race-conditions"></a>
 
-Safe Rust guarantees an absence of data races, which are defined as:
+# データ競合と競合状態
 
-* two or more threads concurrently accessing a location of memory
-* one or more of them is a write
-* one or more of them is unsynchronized
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-A data race has Undefined Behavior, and is therefore impossible to perform in
-Safe Rust. Data races are prevented *mostly* through Rust's ownership system alone:
-it's impossible to alias a mutable reference, so it's impossible to perform a
-data race. Interior mutability makes this more complicated, which is largely why
-we have the Send and Sync traits (see the next section for more on this).
+安全な Rust はデータ競合が存在しないことを保証します。データ競合は次のように定義されます。
 
-**However Rust does not prevent general race conditions.**
+* 2 つ以上のスレッドがメモリ上のある場所に並行してアクセスしています
+* そのうち 1 つ以上が書き込みです
+* そのうち 1 つ以上が同期されていません
 
-This is mathematically impossible in situations where you do not control the
-scheduler, which is true for the normal OS environment. If you do control
-preemption, it _can be_ possible to prevent general races - this technique is
-used by frameworks such as [RTIC](https://github.com/rtic-rs/rtic). However,
-actually having control over scheduling is a very uncommon case.
+データ競合は未定義動作であり、そのため安全な Rust では起こせません。データ競合は、*ほとんどの場合* Rust の所有権システムだけで防がれます。可変参照の別名を作ることは不可能なので、データ競合を起こすことも不可能です。内部可変性がこれを複雑にすることが、Send と Sync トレイトが存在する主な理由です（詳しくは次の節を参照してください）。
 
-For this reason, it is considered "safe" for Rust to get deadlocked or do
-something nonsensical with incorrect synchronization: this is known as a general
-race condition or resource race. Obviously such a program isn't very good, but
-Rust of course cannot prevent all logic errors.
+**しかし、Rust は一般的な競合状態を防ぎません。**
 
-In any case, a race condition cannot violate memory safety in a Rust program on
-its own. Only in conjunction with some other unsafe code can a race condition
-actually violate memory safety. For instance, a correct program looks like this:
+スケジューラを制御できない状況では、これは数学的に不可能です。通常の OS 環境がこの状況に当たります。プリエンプションを制御できるなら、一般的な競合を防ぐことが_可能な場合もあります_。この手法は [RTIC](https://github.com/rtic-rs/rtic) などのフレームワークで使われています。しかし、実際にスケジューリングを制御できるケースは非常にまれです。
+
+このため、Rust がデッドロックに陥ったり、不正な同期によって意味のないことをしたりしても「安全」とみなされます。これは一般的な競合状態、あるいはリソース競合と呼ばれます。明らかに、そのようなプログラムはあまり良くありませんが、もちろん Rust はすべての論理エラーを防ぐことはできません。
+
+いずれにせよ、競合状態だけで Rust プログラムのメモリ安全性を侵害することはできません。他のアンセーフなコードと組み合わさった場合に限り、競合状態は実際にメモリ安全性を侵害し得ます。たとえば、正しいプログラムは次のようになります。
 
 ```rust,no_run
 use std::thread;
@@ -60,8 +51,7 @@ thread::spawn(move || {
 println!("{}", data[idx.load(Ordering::SeqCst)]);
 ```
 
-We can cause a race condition to violate memory safety if we instead do the bound
-check in advance, and then unsafely access the data with an unchecked value:
+代わりに境界チェックを先に行い、その後、未チェックの値でデータにアンセーフにアクセスすると、競合状態によってメモリ安全性を侵害することができます。
 
 ```rust,no_run
 use std::thread;

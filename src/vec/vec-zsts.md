@@ -1,33 +1,37 @@
-# Handling Zero-Sized Types
+<a id="handling-zero-sized-types"></a>
 
-It's time. We're going to fight the specter that is zero-sized types. Safe Rust
-*never* needs to care about this, but Vec is very intensive on raw pointers and
-raw allocations, which are exactly the two things that care about
-zero-sized types. We need to be careful of two things:
+# サイズ0の型の扱い
 
-* The raw allocator API has undefined behavior if you pass in 0 for an
-  allocation size.
-* raw pointer offsets are no-ops for zero-sized types, which will break our
-  C-style pointer iterator.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-Thankfully we abstracted out pointer-iterators and allocating handling into
-`RawValIter` and `RawVec` respectively. How mysteriously convenient.
+いよいよです。サイズ0の型という幽霊と戦います。安全な Rust ではこれを気にする必要は
+*決して*ありませんが、Vec は生ポインタと生のアロケーションを多用します。
+まさにこの2つで、サイズ0の型を気にする必要があるのです。注意点は2つあります。
 
-## Allocating Zero-Sized Types
+* 生のアロケータ API にアロケーションのサイズとして0を渡すと、未定義動作になります。
+* サイズ0の型に対する生ポインタのオフセットは no-op（何もしない操作）なので、
+  C 形式のポインタイテレータが壊れます。
 
-So if the allocator API doesn't support zero-sized allocations, what on earth
-do we store as our allocation? `NonNull::dangling()` of course! Almost every operation
-with a ZST is a no-op since ZSTs have exactly one value, and therefore no state needs
-to be considered to store or load them. This actually extends to `ptr::read` and
-`ptr::write`: they won't actually look at the pointer at all. As such we never need
-to change the pointer.
+ありがたいことに、ポインタイテレータとアロケーションの処理は、それぞれ
+`RawValIter` と `RawVec` に抽象化して切り出してあります。不思議なほど都合がよいですね。
 
-Note however that our previous reliance on running out of memory before overflow is
-no longer valid with zero-sized types. We must explicitly guard against capacity
-overflow for zero-sized types.
+<a id="allocating-zero-sized-types"></a>
 
-Due to our current architecture, all this means is writing 3 guards, one in each
-method of `RawVec`.
+## サイズ0の型のアロケート
+
+アロケータ API がサイズ0のアロケーションをサポートしないなら、いったい何を
+アロケーションとして保存するのでしょうか？もちろん `NonNull::dangling()` です！
+ZST はちょうど1つの値を持つため、ほぼすべての操作は no-op です。したがって、
+保存や読み込みのために考慮すべき状態もありません。これは `ptr::read` と `ptr::write` にも
+当てはまります。実際にはポインタをまったく見ません。そのため、ポインタを変更する必要は
+決してありません。
+
+ただし、サイズ0の型では、オーバーフローする前にメモリ不足になるという、これまでの
+前提がもはや有効でないことに注意してください。サイズ0の型については、容量の
+オーバーフローを明示的に防がなければなりません。
+
+現在の設計では、これは `RawVec` の各メソッドに1つずつ、計3つのガードを書くことだけを
+意味します。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -97,15 +101,16 @@ impl<T> Drop for RawVec<T> {
 }
 ```
 
-That's it. We support pushing and popping zero-sized types now. Our iterators
-(that aren't provided by slice Deref) are still busted, though.
+これだけです。サイズ0の型のプッシュとポップをサポートできました。ただし、
+（スライスへの Deref から提供されるもの以外の）イテレータはまだ壊れています。
 
-## Iterating Zero-Sized Types
+<a id="iterating-zero-sized-types"></a>
 
-Zero-sized offsets are no-ops. This means that our current design will always
-initialize `start` and `end` as the same value, and our iterators will yield
-nothing. The current solution to this is to cast the pointers to integers,
-increment, and then cast them back:
+## サイズ0の型の反復処理
+
+サイズ0の型のオフセットは no-op です。つまり現在の設計では、`start` と `end` は
+常に同じ値で初期化され、イテレータは何も返しません。現時点での解決策は、
+ポインタを整数にキャストして増やし、その後ポインタへキャストし直すことです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -125,11 +130,10 @@ impl<T> RawValIter<T> {
 }
 ```
 
-Now we have a different bug. Instead of our iterators not running at all, our
-iterators now run *forever*. We need to do the same trick in our iterator impls.
-Also, our size_hint computation code will divide by 0 for ZSTs. Since we'll
-basically be treating the two pointers as if they point to bytes, we'll just
-map size 0 to divide by 1. Here's what `next` will be:
+今度は別のバグがあります。まったく動かなかったイテレータが、今度は*永遠に*動きます。
+イテレータの実装でも同じ仕掛けが必要です。また、size_hint の計算コードは ZST では
+0で割ってしまいます。基本的には2つのポインタをバイトを指すかのように扱うので、
+サイズ0の場合は1で割るようにします。`next` は次のようになります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -150,20 +154,20 @@ fn next(&mut self) -> Option<T> {
 }
 ```
 
-Do you see the "bug"? No one else did! The original author only noticed the
-problem when linking to this page years later. This code is kind of dubious
-because abusing the iterator pointers to be *counters* makes them unaligned!
-Our *one job* when using ZSTs is to keep pointers aligned! *forehead slap*
+「バグ」が見えますか？誰も気付きませんでした！原著者も、数年後にこのページへの
+リンクを張ったときにようやく気付きました。このコードは少々怪しいものです。
+イテレータのポインタを*カウンタ*として流用すると、アラインメントを満たさなくなるからです！
+ZST を使うときの*唯一の仕事*は、ポインタのアラインメントを保つことなのに！*額をぴしゃり*
 
-Raw pointers don't need to be aligned at all times, so the basic trick of
-using pointers as counters is *fine*, but they *should* definitely be aligned
-when passed to `ptr::read`! This is *possibly* needless pedantry
-because `ptr::read` is a noop for a ZST, but let's be a *little* more
-responsible and read from `NonNull::dangling` on the ZST path.
+生ポインタは常にアラインメントを満たす必要はないので、ポインタをカウンタにする
+基本的な仕掛け自体は*問題ありません*。しかし `ptr::read` に渡すときは、確実に
+アラインメントを満たす*べき*です！ZST の `ptr::read` は no-op なので、これは
+不要な細かさ*かもしれません*が、*もう少し*責任を持って、ZST の経路では
+`NonNull::dangling` から読みましょう。
 
-(Alternatively you could call `read_unaligned` on the ZST path. Either is fine,
-because either way we're making up a value from nothing and it all compiles
-to doing nothing.)
+（代わりに ZST の経路で `read_unaligned` を呼んでもかまいません。どちらでも、
+何もないところから値を作り出しており、すべて何もしないコードにコンパイルされるため、
+どちらでも問題ありません。）
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -213,9 +217,15 @@ impl<T> DoubleEndedIterator for RawValIter<T> {
 }
 ```
 
-And that's it. Iteration works!
+これで完了です。反復処理が動きます！
 
-One last thing we need to consider is that when our vector is dropped, it deallocates the memory that was allocated while it was alive. With ZSTs, we didn't allocate any memory; in fact, we never do. So, right now, our code has unsoundness: we're still trying to deallocate a `NonNull::dangling()` pointer that we use to simulate the ZST in our vector. This means we'd cause undefined behavior if we tried to deallocate something we never allocated (obviously, and for good reasons). To fix this, in our `RawVec`'s `Drop` trait, we're going to tweak it to ensure we only deallocate types that are sized.
+最後に考慮すべきことがもう1つあります。ベクタはドロップされると、生存中にアロケートした
+メモリをデアロケートします。ZST ではメモリを何もアロケートしていません。実際、
+決してしません。したがって、現時点のコードは不健全です。ベクタ内の ZST を模擬するために
+使う `NonNull::dangling()` ポインタを、まだデアロケートしようとしています。
+つまり、一度もアロケートしなかったものをデアロケートしようとすると、未定義動作を
+引き起こします（当然であり、もっともな理由があります）。これを直すため、`RawVec` の
+`Drop` トレイトの実装を調整し、サイズのある型だけをデアロケートするようにします。
 
 ```rust,ignore
 impl<T> Drop for RawVec<T> {

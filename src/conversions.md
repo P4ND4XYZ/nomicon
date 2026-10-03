@@ -1,16 +1,12 @@
-# Type Conversions
+<a id="type-conversions"></a>
 
-At the end of the day, everything is just a pile of bits somewhere, and type
-systems are just there to help us use those bits right. There are two common
-problems with typing bits: needing to reinterpret those exact bits as a
-different type, and needing to change the bits to have equivalent meaning for
-a different type. Because Rust encourages encoding important properties in the
-type system, these problems are incredibly pervasive. As such, Rust
-consequently gives you several ways to solve them.
+# 型変換
 
-First we'll look at the ways that Safe Rust gives you to reinterpret values.
-The most trivial way to do this is to just destructure a value into its
-constituent parts and then build a new type out of them. e.g.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+結局のところ、すべてはどこかにあるビットの集まりにすぎず、型システムはそのビットを正しく使うための手助けとして存在します。ビットに型を与える際には、よくある問題が2つあります。同じビットをそのまま別の型として再解釈する必要があることと、別の型で同等の意味を持つようにビットを変更する必要があることです。Rust は重要な性質を型システムに組み込むことを推奨しているので、これらの問題は非常に広く現れます。そのため、Rust はこれらを解決する方法をいくつか用意しています。
+
+まず、安全な Rust が提供する、値を再解釈する方法を見ていきます。最も単純な方法は、値を構成要素に分解し、それらから新しい型の値を組み立てることです。例えば、次のようにします。
 
 ```rust
 struct Foo {
@@ -29,5 +25,4 @@ fn reinterpret(foo: Foo) -> Bar {
 }
 ```
 
-But this is, at best, annoying. For common conversions, Rust provides
-more ergonomic alternatives.
+しかし、これはよくても煩わしい方法です。よくある変換については、Rust はもっと扱いやすい代替手段を提供しています。

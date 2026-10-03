@@ -1,57 +1,31 @@
-# Transmutes
+<a id="transmutes"></a>
 
-Get out of our way type system! We're going to reinterpret these bits or die
-trying! Even though this book is all about doing things that are unsafe, I
-really can't emphasize enough that you should deeply think about finding Another Way
-than the operations covered in this section. This is really, truly, the most
-horribly unsafe thing you can do in Rust. The guardrails here are dental floss.
+# トランスミュート
 
-[`mem::transmute<T, U>`][transmute] takes a value of type `T` and reinterprets
-it to have type `U`. The only restriction is that the `T` and `U` are verified
-to have the same size. The ways to cause Undefined Behavior with this are mind
-boggling.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-* First and foremost, creating an instance of *any* type with an invalid state
-  is going to cause arbitrary chaos that can't really be predicted. Do not
-  transmute `3` to `bool`. Even if you never *do* anything with the `bool`. Just
-  don't.
+型システムにはどいてもらいましょう！ 命懸けでも、このビットを再解釈するのです！ この本はアンセーフなことを行うための本ですが、この節で扱う操作以外の「別の方法」を見つけることを真剣に考えるべきだという点は、いくら強調しても足りません。これは本当に、まさしく、Rust でできる最も恐ろしくアンセーフなことです。ここでのガードレールはデンタルフロス同然です。
 
-* Transmute has an overloaded return type. If you do not specify the return type
-  it may produce a surprising type to satisfy inference.
+[`mem::transmute<T, U>`][transmute] は型 `T` の値を受け取り、型 `U` の値として再解釈します。唯一の制約は、`T` と `U` が同じサイズであることが検証される点です。これによって未定義動作を引き起こす方法は、気が遠くなるほどあります。
 
-* Transmuting an `&` to `&mut` is Undefined Behavior. While certain usages may
-  *appear* safe, note that the Rust optimizer is free to assume that a shared
-  reference won't change through its lifetime and thus such transmutation will
-  run afoul of those assumptions. So:
-  * Transmuting an `&` to `&mut` is *always* Undefined Behavior.
-  * No you can't do it.
-  * No you're not special.
+* まず何よりも、*どのような*型であれ、無効な状態のインスタンスを作ると、実際には予測できない、あらゆる混乱を引き起こします。`3` を `bool` にトランスミュートしないでください。その `bool` を使って何も*しない*場合であってもです。とにかく、やめてください。
 
-* Transmuting to a reference without an explicitly provided lifetime
-  produces an [unbounded lifetime].
+* トランスミュートの戻り値の型はオーバーロードされています。戻り値の型を指定しないと、推論を満たすために意外な型になる可能性があります。
 
-* When transmuting between different compound types, you have to make sure they
-  are laid out the same way! If layouts differ, the wrong fields are going to
-  get filled with the wrong data, which will make you unhappy and can also be
-  Undefined Behavior (see above).
+* `&` を `&mut` にトランスミュートすることは未定義動作です。一部の使い方は安全に*見える*かもしれませんが、Rust のオプティマイザは、共有参照がそのライフタイムを通じて変化しないと自由に仮定できるため、このようなトランスミュートはその仮定に反することに注意してください。したがって、次のことが言えます。
+  * `&` を `&mut` にトランスミュートすることは*常に*未定義動作です。
+  * いいえ、行ってはいけません。
+  * いいえ、あなたも例外ではありません。
 
-  So how do you know if the layouts are the same? For `repr(C)` types and
-  `repr(transparent)` types, layout is precisely defined. But for your
-  run-of-the-mill `repr(Rust)`, it is not. Even different instances of the same
-  generic type can have wildly different layout. `Vec<i32>` and `Vec<u32>`
-  *might* have their fields in the same order, or they might not. The details of
-  what exactly is and is not guaranteed for data layout are still being worked
-  out over [at the UCG WG][ucg-layout].
+* ライフタイムを明示せずに参照へトランスミュートすると、[無制限のライフタイム][unbounded lifetime]が生じます。
 
-[`mem::transmute_copy<T, U>`][transmute_copy] somehow manages to be *even more*
-wildly unsafe than this. It copies `size_of<U>` bytes out of an `&T` and
-interprets them as a `U`.  The size check that `mem::transmute` has is gone (as
-it may be valid to copy out a prefix), though it is Undefined Behavior for `U`
-to be larger than `T`.
+* 異なる複合型の間でトランスミュートするときは、同じように配置されていることを確認しなければなりません！ レイアウトが違うと、間違ったフィールドに間違ったデータが入り、困った事態になりますし、未定義動作にもなりえます（上記を参照してください）。
 
-Also of course you can get all of the functionality of these functions using raw
-pointer casts or `union`s, but without any of the lints or other basic sanity
-checks. Raw pointer casts and `union`s do not magically avoid the above rules.
+  では、レイアウトが同じかどうかはどうすれば分かるのでしょうか？ `repr(C)` 型と `repr(transparent)` 型については、レイアウトが正確に定義されています。しかし、普通の `repr(Rust)` についてはそうではありません。同じジェネリック型の異なる具体化でさえ、レイアウトが大きく異なる可能性があります。`Vec<i32>` と `Vec<u32>` のフィールドは同じ順序で並ぶ*かもしれません*し、そうでないかもしれません。データレイアウトについて何が保証され、何が保証されないのかという正確な詳細は、今も [UCG WG で][ucg-layout]検討されています。
+
+[`mem::transmute_copy<T, U>`][transmute_copy] は、どういうわけか、これより*さらに*とんでもなくアンセーフです。`&T` から `size_of<U>` バイトをコピーし、それを `U` として解釈します。`mem::transmute` にあるサイズチェックはありません（先頭部分をコピーすることが有効な場合もあるためです）が、`U` が `T` より大きければ未定義動作です。
+
+もちろん、生ポインタのキャストや `union` を使ってこれらの関数のすべての機能を実現することもできますが、その場合は lint やその他の基本的な妥当性チェックが一切ありません。生ポインタのキャストや `union` によって、上記の規則を魔法のように回避できるわけではありません。
 
 [unbounded lifetime]: ./unbounded-lifetimes.md
 [transmute]: ../std/mem/fn.transmute.html

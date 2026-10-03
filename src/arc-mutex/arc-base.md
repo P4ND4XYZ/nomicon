@@ -1,14 +1,18 @@
-# Base Code
+<a id="base-code"></a>
 
-Now that we've decided the layout for our implementation of `Arc`, let's create
-some basic code.
+# 基本コード
 
-## Constructing the Arc
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-We'll first need a way to construct an `Arc<T>`.
+`Arc` の実装のレイアウトが決まったので、基本的なコードを作りましょう。
 
-This is pretty simple, as we just need to box the `ArcInner<T>` and get a
-`NonNull<T>` pointer to it.
+<a id="constructing-the-arc"></a>
+
+## Arc の構築
+
+まず、`Arc<T>` を構築する方法が必要です。
+
+これはとても単純です。`ArcInner<T>` を Box に入れ、それを指す `NonNull<T>` ポインタを取得するだけです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -30,17 +34,17 @@ impl<T> Arc<T> {
 }
 ```
 
-## Send and Sync
+<a id="send-and-sync"></a>
 
-Since we're building a concurrency primitive, we'll need to be able to send it
-across threads. Thus, we can implement the `Send` and `Sync` marker traits. For
-more information on these, see [the section on `Send` and
-`Sync`](../send-and-sync.md).
+## Send と Sync
 
-This is okay because:
-* You can only get a mutable reference to the value inside an `Arc` if and only
-  if it is the only `Arc` referencing that data (which only happens in `Drop`)
-* We use atomics for the shared mutable reference counting
+並行処理のプリミティブを作っているので、スレッド間で送信できる必要があります。
+そこで、`Send` と `Sync` のマーカートレイトを実装できます。
+詳細は、[`Send` と `Sync` の節](../send-and-sync.md)を参照してください。
+
+これが問題ない理由は次のとおりです。
+* `Arc` 内の値への可変参照を取得できるのは、そのデータを参照する `Arc` がそれ一つだけの場合、かつその場合に限ります（これは `Drop` 内でのみ起こります）
+* 共有された可変の参照カウントにはアトミックを使います
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -48,48 +52,42 @@ unsafe impl<T: Sync + Send> Send for Arc<T> {}
 unsafe impl<T: Sync + Send> Sync for Arc<T> {}
 ```
 
-We need to have the bound `T: Sync + Send` because if we did not provide those
-bounds, it would be possible to share values that are thread-unsafe across a
-thread boundary via an `Arc`, which could possibly cause data races or
-unsoundness.
+`T: Sync + Send` という境界が必要です。これらの境界を設けなければ、スレッド安全でない値を `Arc` 経由でスレッド境界を越えて共有でき、データ競合や不健全性を引き起こす可能性があるからです。
 
-For example, if those bounds were not present, `Arc<Rc<u32>>` would be `Sync` or
-`Send`, meaning that you could clone the `Rc` out of the `Arc` to send it across
-a thread (without creating an entirely new `Rc`), which would create data races
-as `Rc` is not thread-safe.
+例えば、これらの境界がなければ、`Arc<Rc<u32>>` は `Sync` または `Send` になります。
+つまり、`Arc` から `Rc` をクローンして（まったく新しい `Rc` を作らずに）別のスレッドへ送信できます。
+`Rc` はスレッド安全ではないので、これはデータ競合を引き起こします。
 
-## Getting the `ArcInner`
+<a id="getting-the-arcinner"></a>
 
-To dereference the `NonNull<T>` pointer into a `&T`, we can call
-`NonNull::as_ref`. This is unsafe, unlike the typical `as_ref` function, so we
-must call it like this:
+## `ArcInner` の取得
+
+`NonNull<T>` ポインタを参照外しして `&T` にするには、`NonNull::as_ref` を呼び出せます。
+これは通常の `as_ref` 関数とは異なりアンセーフなので、次のように呼び出さなければなりません。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 unsafe { self.ptr.as_ref() }
 ```
 
-We'll be using this snippet a few times in this code (usually with an associated
-`let` binding).
+このコードでは、この断片を何度か使います（通常は対応する `let` 束縛とともに使います）。
 
-This unsafety is okay because while this `Arc` is alive, we're guaranteed that
-the inner pointer is valid.
+この `Arc` が生きている間、内部のポインタが有効であることが保証されるため、このアンセーフな操作は問題ありません。
 
 ## Deref
 
-Alright. Now we can make `Arc`s (and soon will be able to clone and destroy them correctly), but how do we get
-to the data inside?
+さて、`Arc` を作れるようになりました（まもなく正しくクローンし、破棄できるようにもなります）が、中のデータにはどうアクセスするのでしょうか？
 
-What we need now is an implementation of `Deref`.
+今必要なのは `Deref` の実装です。
 
-We'll need to import the trait:
+このトレイトをインポートする必要があります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 use std::ops::Deref;
 ```
 
-And here's the implementation:
+実装は次のとおりです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -103,12 +101,13 @@ impl<T> Deref for Arc<T> {
 }
 ```
 
-Pretty simple, eh? This simply dereferences the `NonNull` pointer to the
-`ArcInner<T>`, then gets a reference to the data inside.
+とても単純ですね。`ArcInner<T>` を指す `NonNull` ポインタを参照外しし、中のデータへの参照を取得するだけです。
 
-## Code
+<a id="code"></a>
 
-Here's all the code from this section:
+## コード
+
+この節のコード全体は次のとおりです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

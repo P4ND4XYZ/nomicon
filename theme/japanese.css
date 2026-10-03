@@ -1,0 +1,7 @@
+/* Keep short Japanese technical terms legible in narrow tables. */
+@media (max-width: 450px) {
+    main .table-wrapper th,
+    main .table-wrapper td {
+        padding: 4px 8px;
+    }
+}

@@ -1,46 +1,43 @@
 # IntoIter
 
-Let's move on to writing iterators. `iter` and `iter_mut` have already been
-written for us thanks to The Magic of Deref. However there's two interesting
-iterators that Vec provides that slices can't: `into_iter` and `drain`.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-IntoIter consumes the Vec by-value, and can consequently yield its elements
-by-value. In order to enable this, IntoIter needs to take control of Vec's
-allocation.
+イテレータの実装に進みましょう。Deref の魔法のおかげで、`iter` と `iter_mut` は
+すでに用意されています。しかし、Vec が提供し、スライスでは提供できない興味深い
+イテレータが2つあります。`into_iter` と `drain` です。
 
-IntoIter needs to be DoubleEnded as well, to enable reading from both ends.
-Reading from the back could just be implemented as calling `pop`, but reading
-from the front is harder. We could call `remove(0)` but that would be insanely
-expensive. Instead we're going to just use ptr::read to copy values out of
-either end of the Vec without mutating the buffer at all.
+IntoIter は Vec を値渡しで消費するため、その要素も値として返せます。
+これを可能にするには、IntoIter が Vec のアロケーションの管理を引き継ぐ必要があります。
 
-To do this we're going to use a very common C idiom for array iteration. We'll
-make two pointers; one that points to the start of the array, and one that
-points to one-element past the end. When we want an element from one end, we'll
-read out the value pointed to at that end and move the pointer over by one. When
-the two pointers are equal, we know we're done.
+IntoIter は両端から読み出せるよう、DoubleEnded でもある必要があります。
+後ろからの読み出しは単に `pop` を呼ぶことで実装できますが、前からは難しくなります。
+`remove(0)` を呼ぶこともできますが、途方もなく高コストです。代わりに ptr::read を使い、
+バッファをまったく変更せずに Vec のどちらの端からも値をコピーして取り出します。
 
-Note that the order of read and offset are reversed for `next` and `next_back`
-For `next_back` the pointer is always after the element it wants to read next,
-while for `next` the pointer is always at the element it wants to read next.
-To see why this is, consider the case where every element but one has been
-yielded.
+そのために、配列の反復処理でよく使われる C のイディオムを使います。
+配列の先頭を指すポインタと、末尾の1要素先を指すポインタを作ります。
+片方の端から要素が欲しいときは、その端のポインタが指す値を読み出し、ポインタを1つ
+進めます。2つのポインタが等しくなれば、完了したと分かります。
 
-The array looks like this:
+`next` と `next_back` では読み出しとオフセットの順序が逆になることに注意してください。
+`next_back` のポインタは常に次に読みたい要素の後ろにあり、`next` のポインタは常に
+次に読みたい要素を指しています。理由を理解するため、1つを除くすべての要素を
+返した場合を考えてみましょう。
+
+配列は次のようになっています。
 
 ```text
           S  E
 [X, X, X, O, X, X, X]
 ```
 
-If E pointed directly at the element it wanted to yield next, it would be
-indistinguishable from the case where there are no more elements to yield.
+もし E が次に返したい要素を直接指していたら、もう返す要素がない場合と
+区別できなくなります。
 
-Although we don't actually care about it during iteration, we also need to hold
-onto the Vec's allocation information in order to free it once IntoIter is
-dropped.
+反復処理中には実際に使いませんが、IntoIter がドロップされたときに解放できるよう、
+Vec のアロケーション情報も保持する必要があります。
 
-So we're going to use the following struct:
+そこで次の構造体を使います。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -52,7 +49,7 @@ pub struct IntoIter<T> {
 }
 ```
 
-And this is what we end up with for initialization:
+初期化のコードは次のようになります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -83,7 +80,7 @@ impl<T> IntoIterator for Vec<T> {
 }
 ```
 
-Here's iterating forward:
+前方への反復処理は次のとおりです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -109,7 +106,7 @@ impl<T> Iterator for IntoIter<T> {
 }
 ```
 
-And here's iterating backwards.
+後方への反復処理は次のとおりです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -127,9 +124,8 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 }
 ```
 
-Because IntoIter takes ownership of its allocation, it needs to implement Drop
-to free it. However it also wants to implement Drop to drop any elements it
-contains that weren't yielded.
+IntoIter はアロケーションの所有権を引き継ぐため、解放のために Drop を実装する必要が
+あります。また、返されずに残ったすべての要素をドロップするためにも Drop を実装したいところです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

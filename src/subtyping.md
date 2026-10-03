@@ -1,16 +1,17 @@
-# Subtyping and Variance
+<a id="subtyping-and-variance"></a>
 
-Rust uses lifetimes to track the relationships between borrows and ownership.
-However, a naive implementation of lifetimes would be either too restrictive,
-or permit undefined behavior.
+# サブタイピングと変性
 
-In order to allow flexible usage of lifetimes
-while also preventing their misuse, Rust uses **subtyping** and **variance**.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-Let's start with an example.
+Rust は、借用と所有権の関係を追跡するためにライフタイムを使います。しかし、ライフタイムを素朴に実装すると、制約が厳しすぎるか、未定義動作を許してしまうかのどちらかになります。
+
+ライフタイムを柔軟に使えるようにしつつ、誤用も防ぐために、Rust は**サブタイピング**と**変性**を使います。
+
+まず例を見てみましょう。
 
 ```rust
-// Note: debug expects two parameters with the *same* lifetime
+// 注: debug は、*同じ*ライフタイムを持つ2つの引数を期待します
 fn debug<'a>(a: &'a str, b: &'a str) {
     println!("a = {a:?} b = {b:?}");
 }
@@ -19,14 +20,13 @@ fn main() {
     let hello: &'static str = "hello";
     {
         let world = String::from("world");
-        let world = &world; // 'world has a shorter lifetime than 'static
+        let world = &world; // 'world は 'static より短いライフタイムです
         debug(hello, world);
     }
 }
 ```
 
-In a conservative implementation of lifetimes, since `hello` and `world` have different lifetimes,
-we might see the following error:
+保守的なライフタイムの実装では、`hello` と `world` のライフタイムが異なるため、次のようなエラーが出るかもしれません。
 
 ```text
 error[E0308]: mismatched types
@@ -38,42 +38,33 @@ error[E0308]: mismatched types
    |                      expected `&'static str`, found struct `&'world str`
 ```
 
-This would be rather unfortunate. In this case,
-what we want is to accept any type that lives *at least as long* as `'world`.
-Let's try using subtyping with our lifetimes.
+これは困ります。この場合に受け入れたいのは、`'world` と*少なくとも同じ長さだけ*存続するあらゆる型です。ライフタイムにサブタイピングを使ってみましょう。
 
-## Subtyping
+<a id="subtyping"></a>
 
-Subtyping is the idea that one type can be used in place of another.
+## サブタイピング
 
-Let's define that `Sub` is a subtype of `Super` (we'll be using the notation `Sub <: Super` throughout this chapter).
+サブタイピングとは、ある型を別の型の代わりに使えるという考え方です。
 
-What this is suggesting to us is that the set of *requirements* that `Super` defines
-are completely satisfied by `Sub`. `Sub` may then have more requirements.
+`Sub` は `Super` のサブタイプであると定義しましょう（この章では `Sub <: Super` という記法を使います）。
 
-Now, in order to use subtyping with lifetimes, we need to define the requirement of a lifetime:
+これは、`Super` が定義する*要件*の集合を `Sub` が完全に満たしているということです。`Sub` は、さらに多くの要件を持つこともあります。
 
-> `'a` defines a region of code.
+ライフタイムでサブタイピングを使うには、ライフタイムの要件を定義する必要があります。
 
-Now that we have a defined set of requirements for lifetimes, we can define how they relate to each other:
+> `'a` はコードの領域を定義します。
 
-> `'long <: 'short` if and only if `'long` defines a region of code that **completely contains** `'short`.
+ライフタイムの要件の集合を定義できたので、ライフタイム同士の関係を定義できます。
 
-`'long` may define a region larger than `'short`, but that still fits our definition.
+> `'long <: 'short` であるのは、`'long` が定義するコード領域が `'short` を**完全に含む**場合、かつその場合に限ります。
 
-> As we will see throughout the rest of this chapter,
-subtyping is a lot more complicated and subtle than this,
-but this simple rule is a very good 99% intuition.
-And unless you write unsafe code, the compiler will automatically handle all the corner cases for you.
+`'long` が `'short` より大きい領域を定義していても、この定義に当てはまります。
 
-> But this is the Rustonomicon. We're writing unsafe code,
-so we need to understand how this stuff really works, and how we can mess it up.
+> この章の残りで見ていくように、サブタイピングは実際にはもっと複雑で微妙なものです。しかし、この単純な規則は、99%の場面でとても役立つ直感を与えてくれます。アンセーフなコードを書かない限り、コンパイラがすべての境界的なケースを自動的に処理してくれます。
 
-Going back to our example above, we can say that `'static <: 'world`.
-For now, let's also accept the idea that subtypes of lifetimes can be passed through references
-(more on this in [Variance](#variance)),
-_e.g._ `&'static str` is a subtype of `&'world str`, then we can "downgrade" `&'static str` into a `&'world str`.
-With that, the example above will compile:
+> しかし、これは Rustonomicon です。私たちはアンセーフなコードを書くので、これらが実際にどう動くのか、そしてどうすれば間違えてしまうのかを理解する必要があります。
+
+先ほどの例に戻ると、`'static <: 'world` と言えます。ここでは、ライフタイムのサブタイプ関係が参照を通して引き継がれることも受け入れましょう（詳しくは[変性](#variance)で説明します）。たとえば、`&'static str` が `&'world str` のサブタイプなら、`&'static str` を `&'world str` へ「弱める」ことができます。これにより、先ほどの例はコンパイルできます。
 
 ```rust
 fn debug<'a>(a: &'a str, b: &'a str) {
@@ -84,16 +75,17 @@ fn main() {
     let hello: &'static str = "hello";
     {
         let world = String::from("world");
-        let world = &world; // 'world has a shorter lifetime than 'static
-        debug(hello, world); // hello silently downgrades from `&'static str` into `&'world str`
+        let world = &world; // 'world は 'static より短いライフタイムです
+        debug(hello, world); // hello は暗黙に `&'static str` から `&'world str` へ弱められます
     }
 }
 ```
 
-## Variance
+<a id="variance"></a>
 
-Above, we glossed over the fact that `'static <: 'b` implied that `&'static T <: &'b T`. This uses a property known as _variance_.
-It's not always as simple as this example, though. To understand that, let's try to extend this example a bit:
+## 変性
+
+先ほどは、`'static <: 'b` なら `&'static T <: &'b T` となるという点を詳しく説明しませんでした。ここで使われているのが、*変性*と呼ばれる性質です。ただし、いつもこの例のように単純とは限りません。それを理解するため、例を少し拡張してみましょう。
 
 ```rust,compile_fail,E0597
 fn assign<T>(input: &mut T, val: T) {
@@ -106,76 +98,61 @@ fn main() {
         let world = String::from("world");
         assign(&mut hello, &world);
     }
-    println!("{hello}"); // use after free 😿
+    println!("{hello}"); // 解放後使用 😿
 }
 ```
 
-In `assign`, we are setting the `hello` reference to point to `world`.
-But then `world` goes out of scope, before the later use of `hello` in the println!
+`assign` では、`hello` の参照先を `world` に設定しています。しかし、その後の `println!` で `hello` を使う前に、`world` はスコープを抜けます。
 
-This is a classic use-after-free bug!
+これは典型的な解放後使用のバグです！
 
-Our first instinct might be to blame the `assign` impl, but there's really nothing wrong here.
-It shouldn't be surprising that we might want to assign a `T` into a `T`.
+最初は `assign` の実装を疑いたくなるかもしれませんが、ここには何の問題もありません。`T` に `T` を代入したいと思うのは、当然のことです。
 
-The problem is that we cannot assume `&'static str` can still be downgraded into `&'world str` to satisfy `T`, once it's behind a `&mut` reference.
-This means that `&mut &'static str` **cannot** be a *subtype* of `&mut &'world str`,
-even if `'static` is a subtype of `'world`.
+問題は、`&'static str` が `&mut` 参照の背後に入ると、`T` を満たすために引き続き `&'world str` へ弱められるとは仮定できないことです。つまり、`'static` が `'world` のサブタイプであっても、`&mut &'static str` は `&mut &'world str` の*サブタイプ*には**なれません**。
 
-Variance is the concept that Rust borrows to define relationships about subtypes through their generic parameters.
+変性は、ジェネリックパラメータを介したサブタイプの関係を定義するために、Rust が取り入れている概念です。
 
-> NOTE: For convenience we will define a generic type `F<T>` so
-> that we can easily talk about `T`. Hopefully this is clear in context.
+> 注: 説明の便宜上、`T` について話しやすいようにジェネリック型 `F<T>` を定義します。文脈から意味が伝わればと思います。
 
-The type `F`'s *variance* is how the subtyping of its inputs affects the
-subtyping of its outputs. There are three kinds of variance in Rust. Given two
-types `Sub` and `Super`, where `Sub` is a subtype of `Super`:
+型 `F` の*変性*は、その入力のサブタイプ関係が出力のサブタイプ関係にどう影響するかを表します。Rust には3種類の変性があります。`Sub` が `Super` のサブタイプである2つの型 `Sub` と `Super` に対して、次のように定義します。
 
-* `F` is **covariant** if `F<Sub>` is a subtype of `F<Super>` (the subtype property is passed through)
-* `F` is **contravariant** if `F<Super>` is a subtype of `F<Sub>` (the subtype property is "inverted")
-* `F` is **invariant** otherwise (no subtyping relationship exists)
+* `F<Sub>` が `F<Super>` のサブタイプなら、`F` は**共変**です（サブタイプ関係が引き継がれます）。
+* `F<Super>` が `F<Sub>` のサブタイプなら、`F` は**反変**です（サブタイプ関係が「逆転」します）。
+* それ以外の場合、`F` は**不変**です（サブタイプ関係が存在しません）。
 
-If we remember from the above examples,
-it was ok for us to treat `&'a T` as a subtype of `&'b T` if `'a <: 'b`,
-therefore we can say that `&'a T` is *covariant* over `'a`.
+先ほどの例を思い出すと、`'a <: 'b` なら `&'a T` を `&'b T` のサブタイプとして扱っても問題ありませんでした。したがって、`&'a T` は `'a` に関して*共変*だと言えます。
 
-Also, we saw that it was not ok for us to treat `&mut &'a T` as a subtype of `&mut &'b T`,
-therefore we can say that `&mut T` is *invariant* over `T`
+また、`&mut &'a T` を `&mut &'b T` のサブタイプとして扱うことはできませんでした。したがって、`&mut T` は `T` に関して*不変*だと言えます。
 
-Here is a table of some other generic types and their variances:
+ほかのジェネリック型とその変性を表に示します。
 
-|                 |     'a    |         T         |     U     |
+|                 | 'a | T | U |
 |-----------------|:---------:|:-----------------:|:---------:|
-| `&'a T `        | covariant | covariant         |           |
-| `&'a mut T`     | covariant | invariant         |           |
-| `Box<T>`        |           | covariant         |           |
-| `Vec<T>`        |           | covariant         |           |
-| `UnsafeCell<T>` |           | invariant         |           |
-| `Cell<T>`       |           | invariant         |           |
-| `fn(T) -> U`    |           | **contra**variant | covariant |
-| `*const T`      |           | covariant         |           |
-| `*mut T`        |           | invariant         |           |
+| `&'a T `        | 共変 | 共変 | |
+| `&'a mut T`     | 共変 | 不変 | |
+| `Box<T>`        | | 共変 | |
+| `Vec<T>`        | | 共変 | |
+| `UnsafeCell<T>` | | 不変 | |
+| `Cell<T>`       | | 不変 | |
+| `fn(T) -> U`    | | **反**変 | 共変 |
+| `*const T`      | | 共変 | |
+| `*mut T`        | | 不変 | |
 
-Some of these can be explained simply in relation to the others:
+これらの一部は、ほかの型との関係から簡単に説明できます。
 
-* `Vec<T>` and all other owning pointers and collections follow the same logic as `Box<T>`
-* `Cell<T>` and all other interior mutability types follow the same logic as `UnsafeCell<T>`
-* `UnsafeCell<T>` having interior mutability gives it the same variance properties as `&mut T`
-* `*const T` follows the logic of `&T`
-* `*mut T` follows the logic of `&mut T` (or `UnsafeCell<T>`)
+* `Vec<T>` と、ほかのすべての所有権を持つポインタやコレクションは、`Box<T>` と同じ理屈に従います。
+* `Cell<T>` と、ほかのすべての内部可変性を持つ型は、`UnsafeCell<T>` と同じ理屈に従います。
+* `UnsafeCell<T>` は内部可変性を持つため、`&mut T` と同じ変性の性質を持ちます。
+* `*const T` は `&T` と同じ理屈に従います。
+* `*mut T` は `&mut T`（または `UnsafeCell<T>`）と同じ理屈に従います。
 
-For more types, see the ["Variance" section][variance-table] on the reference.
+さらに多くの型については、Reference の[「変性」の節][variance-table]を参照してください。
 
 [variance-table]: ../reference/subtyping.html#variance
 
-> NOTE: the *only* source of contravariance in the language is the arguments to
-> a function, which is why it really doesn't come up much in practice. Invoking
-> contravariance involves higher-order programming with function pointers that
-> take references with specific lifetimes (as opposed to the usual "any lifetime",
-> which gets into higher rank lifetimes, which work independently of subtyping).
+> 注: この言語で反変性が生じる*唯一*の場所は関数の引数なので、実際にはあまり登場しません。反変性を使うには、特定のライフタイムを持つ参照を受け取る関数ポインタで、高階プログラミングを行うことになります（通常の「任意のライフタイム」とは異なります。そちらは高階ライフタイムに関わるもので、サブタイピングとは独立して機能します）。
 
-Now that we have some more formal understanding of variance,
-let's go through some more examples in more detail.
+変性をより形式的に理解できたので、さらにいくつかの例を詳しく見ていきましょう。
 
 ```rust,compile_fail,E0597
 fn assign<T>(input: &mut T, val: T) {
@@ -192,7 +169,7 @@ fn main() {
 }
 ```
 
-And what do we get when we run this?
+これを実行しようとすると、どうなるでしょうか。
 
 ```text
 error[E0597]: `world` does not live long enough
@@ -207,9 +184,9 @@ error[E0597]: `world` does not live long enough
    |     - `world` dropped here while still borrowed
 ```
 
-Good, it doesn't compile! Let's break down what's happening here in detail.
+よかった、コンパイルできません！何が起こっているのか、詳しく分解してみましょう。
 
-First let's look at the `assign` function:
+まず、`assign` 関数を見ます。
 
 ```rust
 fn assign<T>(input: &mut T, val: T) {
@@ -217,16 +194,13 @@ fn assign<T>(input: &mut T, val: T) {
 }
 ```
 
-All it does is take a mutable reference and a value and overwrite the referent with it.
-What's important about this function is that it creates a type equality constraint. It
-clearly says in its signature the referent and the value must be the *exact same* type.
+この関数がするのは、可変参照と値を受け取り、その値で参照先を上書きすることだけです。重要なのは、この関数が型の等価性制約を作ることです。シグネチャは、参照先と値が*まったく同じ*型でなければならないと明確に述べています。
 
-Meanwhile, in the caller we pass in `&mut &'static str` and `&'world str`.
+一方、呼び出し側では `&mut &'static str` と `&'world str` を渡します。
 
-Because `&mut T` is invariant over `T`, the compiler concludes it can't apply any subtyping
-to the first argument, and so `T` must be exactly `&'static str`.
+`&mut T` は `T` に関して不変なので、コンパイラは第1引数にサブタイピングを適用できないと判断します。したがって、`T` は厳密に `&'static str` でなければなりません。
 
-This is counter to the `&T` case:
+これは `&T` の場合と対照的です。
 
 ```rust
 fn debug<T: std::fmt::Debug>(a: T, b: T) {
@@ -234,19 +208,15 @@ fn debug<T: std::fmt::Debug>(a: T, b: T) {
 }
 ```
 
-where similarly `a` and `b` must have the same type `T`.
-But since `&'a T` *is* covariant over `'a`, we are allowed to perform subtyping.
-So the compiler decides that `&'static str` can become `&'b str` if and only if
-`&'static str` is a subtype of `&'b str`, which will hold if `'static <: 'b`.
-This is true, so the compiler is happy to continue compiling this code.
+ここでも同様に、`a` と `b` は同じ型 `T` でなければなりません。しかし `&'a T` は `'a` に関して共変*なので*、サブタイピングを適用できます。そこでコンパイラは、`&'static str` が `&'b str` のサブタイプである場合、かつその場合に限り、`&'static str` を `&'b str` にできると判断します。これは `'static <: 'b` なら成り立ちます。実際に成り立つので、コンパイラは問題なくこのコードのコンパイルを続けます。
 
-As it turns out, the argument for why it's ok for Box (and Vec, HashMap, etc.) to be covariant is pretty similar to the argument for why it's ok for lifetimes to be covariant: as soon as you try to stuff them in something like a mutable reference, they inherit invariance and you're prevented from doing anything bad.
+実のところ、`Box`（や `Vec`、`HashMap` など）が共変でよい理由は、ライフタイムが共変でよい理由とよく似ています。可変参照のようなものに入れようとした時点で不変性を引き継ぎ、問題のある操作を防げるのです。
 
-However Box makes it easier to focus on the by-value aspect of references that we partially glossed over.
+ただし、`Box` を使うと、ここまで十分には説明してこなかった、参照を値渡しするという側面に注目しやすくなります。
 
-Unlike a lot of languages which allow values to be freely aliased at all times, Rust has a very strict rule: if you're allowed to mutate or move a value, you are guaranteed to be the only one with access to it.
+値がいつでも自由に別名を持てる多くの言語と異なり、Rust にはとても厳格な規則があります。値を変更またはムーブできるなら、その値にアクセスできるのは自分だけだと保証されます。
 
-Consider the following code:
+次のコードを考えてみましょう。
 
 ```rust,ignore
 let hello: Box<&'static str> = Box::new("hello");
@@ -255,52 +225,43 @@ let mut world: Box<&'b str>;
 world = hello;
 ```
 
-There is no problem at all with the fact that we have forgotten that `hello` was alive for `'static`,
-because as soon as we moved `hello` to a variable that only knew it was alive for `'b`,
-**we destroyed the only thing in the universe that remembered it lived for longer**!
+`hello` が `'static` の間存続することを忘れても、まったく問題ありません。`'b` の間存続することしか知らない変数へ `hello` をムーブした時点で、**それがもっと長く存続することを覚えていた、この世で唯一のものを破棄した**からです！
 
-Only one thing left to explain: function pointers.
+あと1つだけ説明が残っています。関数ポインタです。
 
-To see why `fn(T) -> U` should be covariant over `U`, consider the following signature:
+`fn(T) -> U` が `U` に関して共変であるべき理由を見るため、次のシグネチャを考えてみましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 fn get_str() -> &'a str;
 ```
 
-This function claims to produce a `str` bound by some lifetime `'a`. As such, it is perfectly valid to
-provide a function with the following signature instead:
+この関数は、あるライフタイム `'a` によって制限された `str` を生成すると宣言しています。そのため、代わりに次のシグネチャを持つ関数を提供しても、まったく問題ありません。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 fn get_static() -> &'static str;
 ```
 
-So when the function is called, all its caller is expecting is a `&str` which lives at least the lifetime of `'a`,
-it doesn't matter if the value actually lives longer.
+関数を呼び出したとき、呼び出し側が期待しているのは、少なくともライフタイム `'a` の間存続する `&str` だけです。実際に値がもっと長く存続しても問題ありません。
 
-However, the same logic does not apply to *arguments*. Consider trying to satisfy:
+しかし、同じ理屈は*引数*には当てはまりません。次の要件を、
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 fn store_ref(&'a str);
 ```
 
-with:
+次の関数で満たそうとする場合を考えてみましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 fn store_static(&'static str);
 ```
 
-The first function can accept any string reference as long as it lives at least for `'a`,
-but the second cannot accept a string reference that lives for any duration less than `'static`,
-which would cause a conflict.
-Covariance doesn't work here. But if we flip it around, it actually *does*
-work! If we need a function that can handle `&'static str`, a function that can handle *any* reference lifetime
-will surely work fine.
+最初の関数は、少なくとも `'a` の間存続する文字列参照ならどれでも受け取れます。しかし、2つ目の関数は、`'static` より短い期間しか存続しない文字列参照を受け取れません。これでは食い違いが生じます。ここでは共変性は使えません。しかし、関係を逆にすると、実際に*うまくいきます*！`&'static str` を扱える関数が必要なら、*どんな*参照のライフタイムでも扱える関数は、確実に問題なく使えます。
 
-Let's see this in practice
+実際の例を見てみましょう。
 
 ```rust,compile_fail
 # use std::cell::RefCell;
@@ -308,68 +269,63 @@ thread_local! {
     pub static StaticVecs: RefCell<Vec<&'static str>> = RefCell::new(Vec::new());
 }
 
-/// saves the input given into a thread local `Vec<&'static str>`
+/// 渡された入力をスレッドローカルの `Vec<&'static str>` に保存します
 fn store(input: &'static str) {
     StaticVecs.with_borrow_mut(|v| v.push(input));
 }
 
-/// Calls the function with it's input (must have the same lifetime!)
+/// 入力を渡して関数を呼び出します（ライフタイムが同じでなければなりません！）
 fn demo<'a>(input: &'a str, f: fn(&'a str)) {
     f(input);
 }
 
 fn main() {
-    demo("hello", store); // "hello" is 'static. Can call `store` fine
+    demo("hello", store); // "hello" は 'static なので、問題なく `store` を呼び出せます
 
     {
         let smuggle = String::from("smuggle");
 
-        // `&smuggle` is not static. If we were to call `store` with `&smuggle`,
-        // we would have pushed an invalid lifetime into the `StaticVecs`.
-        // Therefore, `fn(&'static str)` cannot be a subtype of `fn(&'a str)`
+        // `&smuggle` は static ではありません。`&smuggle` を渡して `store` を呼び出すと、
+        // 無効なライフタイムを持つ参照を `StaticVecs` に入れてしまいます。
+        // したがって、`fn(&'static str)` は `fn(&'a str)` のサブタイプにはなれません
         demo(&smuggle, store);
     }
 
-    // use after free 😿
+    // 解放後使用 😿
     StaticVecs.with_borrow(|v| println!("{v:?}"));
 }
 ```
 
-And that's why function types, unlike anything else in the language, are
-**contra**variant over their arguments.
+このため、関数型は、言語内のほかのどんなものとも異なり、引数に関して**反**変なのです。
 
-Now, this is all well and good for the types the standard library provides, but
-how is variance determined for types that *you* define? A struct, informally
-speaking, inherits the variance of its fields. If a struct `MyType`
-has a generic argument `A` that is used in a field `a`, then MyType's variance
-over `A` is exactly `a`'s variance over `A`.
+標準ライブラリが提供する型についてはこれでよいとして、*自分で*定義した型の変性はどう決まるのでしょうか。形式ばらずに言うと、構造体はフィールドの変性を引き継ぎます。構造体 `MyType` にジェネリック引数 `A` があり、フィールド `a` で使われているなら、`MyType` の `A` に関する変性は、`a` の `A` に関する変性とまったく同じです。
 
-However if `A` is used in multiple fields:
+ただし、`A` が複数のフィールドで使われる場合は、次のようになります。
 
-* If all uses of `A` are covariant, then MyType is covariant over `A`
-* If all uses of `A` are contravariant, then MyType is contravariant over `A`
-* Otherwise, MyType is invariant over `A`
+* `A` の使用箇所がすべて共変なら、`MyType` は `A` に関して共変です。
+* `A` の使用箇所がすべて反変なら、`MyType` は `A` に関して反変です。
+* それ以外の場合、`MyType` は `A` に関して不変です。
 
 ```rust
 use std::cell::Cell;
 
 struct MyType<'a, 'b, A: 'a, B: 'b, C, D, E, F, G, H, In, Out, Mixed> {
-    a: &'a A,     // covariant over 'a and A
-    b: &'b mut B, // covariant over 'b and invariant over B
+    a: &'a A,     // 'a と A に関して共変
+    b: &'b mut B, // 'b に関して共変、B に関して不変
 
-    c: *const C,  // covariant over C
-    d: *mut D,    // invariant over D
+    c: *const C,  // C に関して共変
+    d: *mut D,    // D に関して不変
 
-    e: E,         // covariant over E
-    f: Vec<F>,    // covariant over F
-    g: Cell<G>,   // invariant over G
+    e: E,         // E に関して共変
+    f: Vec<F>,    // F に関して共変
+    g: Cell<G>,   // G に関して不変
 
-    h1: H,        // would also be covariant over H except...
-    h2: Cell<H>,  // invariant over H, because invariance wins all conflicts
+    h1: H,        // これだけなら H に関して共変ですが……
+    h2: Cell<H>,  // 不変性はすべての衝突に優先するため、H に関して不変
 
-    i: fn(In) -> Out,       // contravariant over In, covariant over Out
+    i: fn(In) -> Out,       // In に関して反変、Out に関して共変
 
-    k1: fn(Mixed) -> usize, // would be contravariant over Mixed except..
-    k2: Mixed,              // invariant over Mixed, because invariance wins all conflicts
+    k1: fn(Mixed) -> usize, // これだけなら Mixed に関して反変ですが……
+    k2: Mixed,              // 不変性はすべての衝突に優先するため、Mixed に関して不変
 }
 ```

@@ -1,4 +1,8 @@
+<a id="references"></a>
+
 # 参照
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
 参照には2種類あります。
 

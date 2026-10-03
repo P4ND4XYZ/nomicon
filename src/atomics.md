@@ -1,33 +1,21 @@
-# Atomics
+<a id="atomics"></a>
 
-Rust pretty blatantly just inherits the memory model for atomics from C++20. This is not
-due to this model being particularly excellent or easy to understand. Indeed,
-this model is quite complex and known to have [several flaws][C11-busted].
-Rather, it is a pragmatic concession to the fact that *everyone* is pretty bad
-at modeling atomics. At the very least, we can benefit from existing tooling and
-research around the C/C++ memory model.
-(You'll often see this model referred to as "C/C++11" or just "C11". C just copies
-the C++ memory model; and C++11 was the first version of the model but it has
-received some bugfixes since then.)
+# アトミック
 
-Trying to fully explain the model in this book is fairly hopeless. It's defined
-in terms of madness-inducing causality graphs that require a full book to
-properly understand in a practical way. If you want all the nitty-gritty
-details, you should check out the [C++ specification][C++-model].
-Still, we'll try to cover the basics and some of the problems Rust developers
-face.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-The C++ memory model is fundamentally about trying to bridge the gap between the
-semantics we want, the optimizations compilers want, and the inconsistent chaos
-our hardware wants. *We* would like to just write programs and have them do
-exactly what we said but, you know, fast. Wouldn't that be great?
+Rust はかなり露骨に、アトミックのメモリモデルを C++20 からそのまま継承しています。これは、このモデルが特に優れていたり、理解しやすかったりするためではありません。実際、このモデルはかなり複雑で、[いくつもの欠陥][C11-busted]があることが知られています。むしろ、アトミックのモデル化は*誰もが*かなり苦手だという事実に対する、実用的な妥協です。少なくとも、C/C++ メモリモデルに関する既存のツールや研究の恩恵を受けられます。
+（このモデルは「C/C++11」や単に「C11」と呼ばれることもよくあります。C は C++ のメモリモデルをそのままコピーしています。また、C++11 はこのモデルの最初のバージョンでしたが、その後いくつかのバグ修正を受けています。）
 
-## Compiler Reordering
+この本でモデルを完全に説明しようとしても、ほとんど望みはありません。気が狂いそうな因果グラフによって定義されており、実用的な形で正しく理解するには丸一冊の本が必要です。細部まで知りたければ、[C++ の仕様][C++-model]を確認してください。それでも、ここでは基礎と、Rust 開発者が直面する問題の一部を取り上げてみます。
 
-Compilers fundamentally want to be able to do all sorts of complicated
-transformations to reduce data dependencies and eliminate dead code. In
-particular, they may radically change the actual order of events, or make events
-never occur! If we write something like:
+C++ メモリモデルは、根本的には、私たちが望む意味論、コンパイラが望む最適化、そしてハードウェアが望む一貫性のない混沌との隔たりを埋めようとするものです。*私たち*は、ただプログラムを書いて、指示したとおりに、しかも速く動かしたいのです。そうなればすばらしいと思いませんか。
+
+<a id="compiler-reordering"></a>
+
+## コンパイラによる並べ替え
+
+コンパイラは基本的に、データ依存を減らし、デッドコードを除去するため、あらゆる複雑な変換を行えることを望みます。特に、実際のイベントの順序を大幅に変えたり、イベントをまったく発生させなくしたりする可能性があります！たとえば次のように書くとします。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -36,7 +24,7 @@ y = 3;
 x = 2;
 ```
 
-The compiler may conclude that it would be best if your program did:
+コンパイラは、プログラムが次のように動くのが最善だと判断するかもしれません。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -44,34 +32,17 @@ x = 2;
 y = 3;
 ```
 
-This has inverted the order of events and completely eliminated one event.
-From a single-threaded perspective this is completely unobservable: after all
-the statements have executed we are in exactly the same state. But if our
-program is multi-threaded, we may have been relying on `x` to actually be
-assigned to 1 before `y` was assigned. We would like the compiler to be
-able to make these kinds of optimizations, because they can seriously improve
-performance. On the other hand, we'd also like to be able to depend on our
-program *doing the thing we said*.
+これによってイベントの順序が逆転し、1 つのイベントが完全に除去されました。シングルスレッドの観点では、この違いはまったく観測できません。すべての文が実行された後は、まったく同じ状態になるからです。しかし、プログラムがマルチスレッドなら、`y` への代入より前に `x` に実際に 1 が代入されることに依存していたかもしれません。このような最適化は性能を大きく改善し得るので、コンパイラにはこれを行えるようにしたいところです。一方で、プログラムが*指示したことを行う*ことにも依存できるようにしたいのです。
 
-## Hardware Reordering
+<a id="hardware-reordering"></a>
 
-On the other hand, even if the compiler totally understood what we wanted and
-respected our wishes, our hardware might instead get us in trouble. Trouble
-comes from CPUs in the form of memory hierarchies. There is indeed a global
-shared memory space somewhere in your hardware, but from the perspective of each
-CPU core it is *so very far away* and *so very slow*. Each CPU would rather work
-with its local cache of the data and only go through all the anguish of
-talking to shared memory only when it doesn't actually have that memory in
-cache.
+## ハードウェアによる並べ替え
 
-After all, that's the whole point of the cache, right? If every read from the
-cache had to run back to shared memory to double check that it hadn't changed,
-what would the point be? The end result is that the hardware doesn't guarantee
-that events that occur in some order on *one* thread, occur in the same
-order on *another* thread. To guarantee this, we must issue special instructions
-to the CPU telling it to be a bit less smart.
+一方、コンパイラが私たちの意図を完全に理解し、その希望を尊重したとしても、代わりにハードウェアが問題を引き起こすかもしれません。CPU が引き起こす問題は、メモリ階層という形で現れます。確かにハードウェアのどこかには大域的な共有メモリ空間がありますが、各 CPU コアから見ると、それは*非常に遠く*、*非常に遅い*のです。各 CPU はむしろデータのローカルキャッシュを使い、実際にそのメモリがキャッシュにない場合だけ、共有メモリとやり取りする面倒を引き受けたいのです。
 
-For instance, say we convince the compiler to emit this logic:
+そもそも、それこそがキャッシュの目的ですよね。キャッシュから読むたびに共有メモリへ戻って、変化していないか再確認しなければならないのなら、何の意味があるでしょうか。その結果、ハードウェアは、*ある*スレッドで一定の順序で発生するイベントが、*別の*スレッドでも同じ順序で発生することを保証しません。これを保証するには、少し賢さを控えるよう CPU に伝える特別な命令を発行しなければなりません。
+
+たとえば、コンパイラに次のロジックを出力させたとします。
 
 ```text
 initial state: x = 0, y = 1
@@ -82,118 +53,61 @@ x = 1;              y *= 2;
                 }
 ```
 
-Ideally this program has 2 possible final states:
+理想的には、このプログラムの最終状態は次の 2 通りです。
 
-* `y = 3`: (thread 2 did the check before thread 1 completed)
-* `y = 6`: (thread 2 did the check after thread 1 completed)
+* `y = 3`: （スレッド 1 が完了する前にスレッド 2 がチェックしました）
+* `y = 6`: （スレッド 1 が完了した後にスレッド 2 がチェックしました）
 
-However there's a third potential state that the hardware enables:
+しかし、ハードウェアによって可能になる第 3 の状態があります。
 
-* `y = 2`: (thread 2 saw `x = 1`, but not `y = 3`, and then overwrote `y = 3`)
+* `y = 2`: （スレッド 2 は `x = 1` を観測しましたが `y = 3` は観測せず、その後 `y = 3` を上書きしました）
 
-It's worth noting that different kinds of CPU provide different guarantees. It
-is common to separate hardware into two categories: strongly-ordered and weakly-ordered.
-Most notably x86/64 provides strong ordering guarantees, while ARM
-provides weak ordering guarantees. This has two consequences for concurrent
-programming:
+CPU の種類によって保証が異なることは、注意に値します。ハードウェアは一般に、強い順序保証を持つものと弱い順序保証を持つものの 2 種類に分けられます。代表的な例として、x86/64 は強い順序保証を、ARM は弱い順序保証を提供します。これは並行プログラミングに 2 つの影響を及ぼします。
 
-* Asking for stronger guarantees on strongly-ordered hardware may be cheap or
-  even free because they already provide strong guarantees unconditionally.
-  Weaker guarantees may only yield performance wins on weakly-ordered hardware.
+* 強い順序保証を持つハードウェアで、より強い保証を要求しても、低コスト、あるいは無コストかもしれません。すでに無条件で強い保証を提供しているからです。保証を弱めることで性能が向上するのは、弱い順序保証を持つハードウェアだけかもしれません。
 
-* Asking for guarantees that are too weak on strongly-ordered hardware is
-  more likely to *happen* to work, even though your program is strictly
-  incorrect. If possible, concurrent algorithms should be tested on
-  weakly-ordered hardware.
+* 強い順序保証を持つハードウェアで弱すぎる保証を要求すると、プログラムは厳密には不正であっても、*たまたま*動く可能性が高くなります。可能なら、並行アルゴリズムは弱い順序保証を持つハードウェアでテストするべきです。
 
-## Data Accesses
+<a id="data-accesses"></a>
 
-The C++ memory model attempts to bridge the gap by allowing us to talk about the
-*causality* of our program. Generally, this is by establishing a *happens
-before* relationship between parts of the program and the threads that are
-running them. This gives the hardware and compiler room to optimize the program
-more aggressively where a strict happens-before relationship isn't established,
-but forces them to be more careful where one is established. The way we
-communicate these relationships are through *data accesses* and *atomic
-accesses*.
+## データアクセス
 
-Data accesses are the bread-and-butter of the programming world. They are
-fundamentally unsynchronized and compilers are free to aggressively optimize
-them. In particular, data accesses are free to be reordered by the compiler on
-the assumption that the program is single-threaded. The hardware is also free to
-propagate the changes made in data accesses to other threads as lazily and
-inconsistently as it wants. Most critically, data accesses are how data races
-happen. Data accesses are very friendly to the hardware and compiler, but as
-we've seen they offer *awful* semantics to try to write synchronized code with.
-Actually, that's too weak.
+C++ メモリモデルは、プログラムの*因果関係*を論じられるようにすることで、この隔たりを埋めようとします。一般には、プログラムの各部分とそれを実行するスレッドとの間に *happens-before* 関係を確立することで行います。これにより、厳密な happens-before 関係が確立されていないところでは、ハードウェアとコンパイラにプログラムをより積極的に最適化する余地を与え、関係が確立されているところでは、より慎重な扱いを強制します。これらの関係は、*データアクセス*と*アトミックアクセス*を通じて伝えます。
 
-**It is literally impossible to write correct synchronized code using only data
-accesses.**
+データアクセスはプログラミングの世界の基本です。根本的に同期されておらず、コンパイラは自由に積極的な最適化を行えます。特に、コンパイラはプログラムがシングルスレッドであると仮定して、データアクセスを自由に並べ替えられます。ハードウェアも、データアクセスによる変更を、好きなだけ遅延させ、一貫性なく他のスレッドへ伝播できます。最も重要なのは、データアクセスがデータ競合を引き起こすということです。データアクセスはハードウェアとコンパイラにとって非常に都合が良いものですが、これまで見たように、同期されたコードを書くには*ひどい*意味論を提供します。いえ、それでは言い方が弱すぎます。
 
-Atomic accesses are how we tell the hardware and compiler that our program is
-multi-threaded. Each atomic access can be marked with an *ordering* that
-specifies what kind of relationship it establishes with other accesses. In
-practice, this boils down to telling the compiler and hardware certain things
-they *can't* do. For the compiler, this largely revolves around re-ordering of
-instructions. For the hardware, this largely revolves around how writes are
-propagated to other threads. The set of orderings Rust exposes are:
+**データアクセスだけを使って、正しく同期されたコードを書くことは、文字どおり不可能です。**
 
-* Sequentially Consistent (SeqCst)
+アトミックアクセスは、プログラムがマルチスレッドであることをハードウェアとコンパイラに伝える方法です。各アトミックアクセスには、他のアクセスとどのような関係を確立するかを指定する*順序付け*を付けられます。実際には、コンパイラとハードウェアに、特定のことを*してはいけない*と伝えることになります。コンパイラの場合、主に命令の並べ替えに関わります。ハードウェアの場合、主に書き込みが他のスレッドへどう伝播するかに関わります。Rust が公開する順序付けは次のとおりです。
+
+* 逐次一貫（SeqCst）
 * Release
 * Acquire
 * Relaxed
 
-(Note: We explicitly do not expose the C++ *consume* ordering)
+（注意: C++ の *consume* 順序付けは、明示的に公開していません。）
 
-TODO: negative reasoning vs positive reasoning? TODO: "can't forget to
-synchronize"
+TODO: 否定的な推論と肯定的な推論の比較？ TODO: 「同期を忘れることはできません」
 
-## Sequentially Consistent
+<a id="sequentially-consistent"></a>
 
-Sequentially Consistent is the most powerful of all, implying the restrictions
-of all other orderings. Intuitively, a sequentially consistent operation
-cannot be reordered: all accesses on one thread that happen before and after a
-SeqCst access stay before and after it. A data-race-free program that uses
-only sequentially consistent atomics and data accesses has the very nice
-property that there is a single global execution of the program's instructions
-that all threads agree on. This execution is also particularly nice to reason
-about: it's just an interleaving of each thread's individual executions. This
-does not hold if you start using the weaker atomic orderings.
+## 逐次一貫
 
-The relative developer-friendliness of sequential consistency doesn't come for
-free. Even on strongly-ordered platforms sequential consistency involves
-emitting memory fences.
+逐次一貫はすべての中で最も強力で、他のすべての順序付けの制約を含みます。直感的には、逐次一貫な操作は並べ替えられません。あるスレッド上で SeqCst アクセスの前後に発生するすべてのアクセスは、その前後にとどまります。逐次一貫なアトミックアクセスとデータアクセスだけを使う、データ競合のないプログラムには、すべてのスレッドが同意する、プログラムの命令の単一の大域的な実行が存在するという、とても良い性質があります。この実行は推論もしやすく、各スレッドの個別の実行を単に交互に組み合わせたものです。より弱いアトミック順序付けを使い始めると、これは成り立ちません。
 
-In practice, sequential consistency is rarely necessary for program correctness.
-However sequential consistency is definitely the right choice if you're not
-confident about the other memory orders. Having your program run a bit slower
-than it needs to is certainly better than it running incorrectly! It's also
-mechanically trivial to downgrade atomic operations to have a weaker
-consistency later on. Just change `SeqCst` to `Relaxed` and you're done! Of
-course, proving that this transformation is *correct* is a whole other matter.
+逐次一貫性が比較的開発者に優しいことには、コストが伴います。強い順序保証を持つプラットフォームでも、逐次一貫性にはメモリフェンスの出力が伴います。
+
+実際には、プログラムの正しさのために逐次一貫性が必要なことはまれです。しかし、他のメモリ順序に自信がないなら、逐次一貫性は間違いなく正しい選択です。プログラムが必要以上に少し遅く動く方が、不正に動くより確実に良いのです！後からアトミック操作を弱い一貫性へ下げるのも、機械的には簡単です。`SeqCst` を `Relaxed` に変えるだけで完了です！もちろん、この変換が*正しい*と証明することは、まったく別の話です。
 
 ## Acquire-Release
 
-Acquire and Release are largely intended to be paired. Their names hint at their
-use case: they're perfectly suited for acquiring and releasing locks, and
-ensuring that critical sections don't overlap.
+Acquire と Release は主に対で使うことを意図しています。その名前は用途を示しています。ロックの獲得と解放、そしてクリティカルセクションが重ならないことの保証に、ぴったり適しています。
 
-Intuitively, an acquire access ensures that every access after it stays after
-it. However operations that occur before an acquire are free to be reordered to
-occur after it. Similarly, a release access ensures that every access before it
-stays before it. However operations that occur after a release are free to be
-reordered to occur before it.
+直感的には、acquire アクセスは、その後のすべてのアクセスがその後にとどまることを保証します。ただし、acquire より前に発生する操作は、その後に発生するよう自由に並べ替えられます。同様に、release アクセスは、その前のすべてのアクセスがその前にとどまることを保証します。ただし、release より後に発生する操作は、その前に発生するよう自由に並べ替えられます。
 
-When thread A releases a location in memory and then thread B subsequently
-acquires *the same* location in memory, causality is established. Every write
-(including non-atomic and relaxed atomic writes) that happened before A's
-release will be observed by B after its acquisition. However no causality is
-established with any other threads. Similarly, no causality is established
-if A and B access *different* locations in memory.
+スレッド A がメモリ上のある場所を release し、その後スレッド B が*同じ*場所を acquire すると、因果関係が確立されます。A の release より前に起きたすべての書き込み（非アトミックな書き込みと relaxed なアトミック書き込みを含みます）は、B が acquire した後に B によって観測されます。ただし、他のスレッドとの因果関係は確立されません。同様に、A と B がメモリ上の*異なる*場所にアクセスする場合にも、因果関係は確立されません。
 
-Basic use of release-acquire is therefore simple: you acquire a location of
-memory to begin the critical section, and then release that location to end it.
-For instance, a simple spinlock might look like:
+したがって、release-acquire の基本的な使い方は単純です。メモリ上のある場所を acquire してクリティカルセクションを開始し、その場所を release して終了します。たとえば、単純なスピンロックは次のようになります。
 
 ```rust
 use std::sync::Arc;
@@ -216,24 +130,13 @@ fn main() {
 }
 ```
 
-On strongly-ordered platforms most accesses have release or acquire semantics,
-making release and acquire often totally free. This is not the case on
-weakly-ordered platforms.
+強い順序保証を持つプラットフォームでは、ほとんどのアクセスが release または acquire の意味論を持つので、release と acquire は完全に無コストであることもよくあります。弱い順序保証を持つプラットフォームでは、そうではありません。
 
 ## Relaxed
 
-Relaxed accesses are the absolute weakest. They can be freely re-ordered and
-provide no happens-before relationship. Still, relaxed operations are still
-atomic. That is, they don't count as data accesses and any read-modify-write
-operations done to them occur atomically. Relaxed operations are appropriate for
-things that you definitely want to happen, but don't particularly otherwise care
-about. For instance, incrementing a counter can be safely done by multiple
-threads using a relaxed `fetch_add` if you're not using the counter to
-synchronize any other accesses.
+Relaxed アクセスは最も弱いものです。自由に並べ替えられ、happens-before 関係を提供しません。それでも、relaxed 操作はアトミックではあります。つまり、データアクセスとはみなされず、それらに対する読み取り・変更・書き込み操作はすべてアトミックに行われます。Relaxed 操作は、確実に起きてほしいが、それ以外については特に気にしないことに適しています。たとえば、他のアクセスの同期にカウンタを使わないなら、複数のスレッドが relaxed な `fetch_add` を使って安全にカウンタを増やせます。
 
-There's rarely a benefit in making an operation relaxed on strongly-ordered
-platforms, since they usually provide release-acquire semantics anyway. However
-relaxed operations can be cheaper on weakly-ordered platforms.
+強い順序保証を持つプラットフォームでは、通常いずれにせよ release-acquire の意味論が提供されるため、操作を relaxed にする利点はほとんどありません。しかし、弱い順序保証を持つプラットフォームでは、relaxed 操作の方が低コストになり得ます。
 
 [C11-busted]: http://plv.mpi-sws.org/c11comp/popl15.pdf
 [C++-model]: https://en.cppreference.com/w/cpp/atomic/memory_order

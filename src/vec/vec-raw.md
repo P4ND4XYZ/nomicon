@@ -1,12 +1,12 @@
 # RawVec
 
-We've actually reached an interesting situation here: we've duplicated the logic
-for specifying a buffer and freeing its memory in Vec and IntoIter. Now that
-we've implemented it and identified *actual* logic duplication, this is a good
-time to perform some logic compression.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-We're going to abstract out the `(ptr, cap)` pair and give them the logic for
-allocating, growing, and freeing:
+ここで興味深い状況になりました。Vec と IntoIter で、バッファを指定し、そのメモリを
+解放するロジックが重複しています。実装して*実際の*ロジックの重複を特定できたので、
+今こそロジックをまとめるよい機会です。
+
+`(ptr, cap)` の組を抽象化して切り出し、アロケート、伸長、解放のロジックを与えます。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -68,7 +68,7 @@ impl<T> Drop for RawVec<T> {
 }
 ```
 
-And change Vec as follows:
+Vec は次のように変更します。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -107,7 +107,7 @@ impl<T> Drop for Vec<T> {
 }
 ```
 
-And finally we can really simplify IntoIter:
+最後に、IntoIter を大幅に簡略化できます。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -151,4 +151,4 @@ impl<T> IntoIterator for Vec<T> {
 }
 ```
 
-Much better.
+ずっとよくなりました。

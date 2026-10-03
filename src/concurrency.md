@@ -1,13 +1,9 @@
-# Concurrency and Parallelism
+<a id="concurrency-and-parallelism"></a>
 
-Rust as a language doesn't *really* have an opinion on how to do concurrency or
-parallelism. The standard library exposes OS threads and blocking sys-calls
-because everyone has those, and they're uniform enough that you can provide
-an abstraction over them in a relatively uncontroversial way. Message passing,
-green threads, and async APIs are all diverse enough that any abstraction over
-them tends to involve trade-offs that we weren't willing to commit to for 1.0.
+# 並行性と並列性
 
-However the way Rust models concurrency makes it relatively easy to design your own
-concurrency paradigm as a library and have everyone else's code Just Work
-with yours. Just require the right lifetimes and Send and Sync where appropriate
-and you're off to the races. Or rather, off to the... not... having... races.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+言語としての Rust は、並行性や並列性をどう実現するかについて、*実際のところ*特定の方針を持ちません。標準ライブラリが OS のスレッドとブロッキングシステムコールを公開するのは、これらがどこにでもあり、比較的異論の出ない形で抽象化を提供できるほど統一されているからです。メッセージパッシング、グリーンスレッド、非同期 API はいずれも多様であり、それらの抽象化には、1.0 の時点では確約したくないトレードオフが伴いがちです。
+
+しかし、Rust における並行性のモデル化の方法によって、独自の並行性のパラダイムをライブラリとして設計し、他の人のコードも自分のコードと組み合わせてそのまま動かすことが、比較的容易になります。適切なライフタイムと、必要なところで Send と Sync を要求するだけで、競争へと走り出せます。いえ、むしろ……競合を……起こさずに……済むのです。

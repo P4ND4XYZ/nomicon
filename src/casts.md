@@ -1,34 +1,46 @@
-# Casts
+<a id="casts"></a>
 
-Casts are a superset of coercions: every coercion can be explicitly invoked via a cast.
-However some conversions require a cast.
-While coercions are pervasive and largely harmless, these "true casts" are rare and potentially dangerous.
-As such, casts must be explicitly invoked using the `as` keyword: `expr as Type`.
+# キャスト
 
-You can find an exhaustive list of [all the true casts][cast list] and [casting semantics][semantics list] on the reference.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-## Safety of casting
+キャストは強制変換の上位集合です。すべての強制変換は、キャストによって明示的に実行できます。
+ただし、一部の変換にはキャストが必要です。
+強制変換は広く使われ、大部分は無害ですが、これらの「真のキャスト」はまれで、潜在的に危険です。
+そのため、キャストは `as` キーワードを使って明示的に実行しなければなりません。`expr as Type` と書きます。
 
-True casts generally revolve around raw pointers and the primitive numeric types.
-Even though they're dangerous, these casts are infallible at runtime.
-If a cast triggers some subtle corner case no indication will be given that this occurred.
-The cast will simply succeed.
-That said, casts must be valid at the type level, or else they will be prevented statically.
-For instance, `7u8 as bool` will not compile.
+リファレンスには、[すべての真のキャスト][cast list]の網羅的な一覧と、[キャストの意味論][semantics list]があります。
 
-That said, casts aren't `unsafe` because they generally can't violate memory safety *on their own*.
-For instance, converting an integer to a raw pointer can very easily lead to terrible things.
-However the act of creating the pointer itself is safe, because actually using a raw pointer is already marked as `unsafe`.
+<a id="safety-of-casting"></a>
 
-## Some notes about casting
+## キャストの安全性
 
-### Lengths when casting raw slices
+真のキャストは一般に、生ポインタとプリミティブな数値型に関するものです。
+これらのキャストは危険ですが、実行時に失敗することはありません。
+キャストが微妙なコーナーケースを引き起こしても、その発生を知らせるものはありません。
+キャストは単に成功します。
+とはいえ、キャストは型レベルでは有効でなければならず、そうでなければ静的に阻止されます。
+例えば、`7u8 as bool` はコンパイルできません。
 
-Note that lengths are not adjusted when casting raw slices; `*const [u16] as *const [u8]` creates a slice that only includes half of the original memory.
+とはいえ、キャストは一般に*それ自体では*メモリ安全性を侵害できないため、`unsafe` ではありません。
+例えば、整数を生ポインタに変換することは、ひどい事態に非常につながりやすいものです。
+しかし、実際に生ポインタを使用することは既に `unsafe` とされているため、ポインタを作る行為自体は安全です。
 
-### Transitivity
+<a id="some-notes-about-casting"></a>
 
-Casting is not transitive, that is, even if `e as U1 as U2` is a valid expression, `e as U2` is not necessarily so.
+## キャストに関する注意点
+
+<a id="lengths-when-casting-raw-slices"></a>
+
+### 生スライスをキャストするときの長さ
+
+生スライスをキャストしても長さは調整されないことに注意してください。`*const [u16] as *const [u8]` は、元のメモリの半分しか含まないスライスを作ります。
+
+<a id="transitivity"></a>
+
+### 推移性
+
+キャストは推移的ではありません。つまり、`e as U1 as U2` が有効な式でも、`e as U2` が必ずしも有効とは限りません。
 
 [cast list]: ../reference/expressions/operator-expr.html#type-cast-expressions
 [semantics list]: ../reference/expressions/operator-expr.html#semantics

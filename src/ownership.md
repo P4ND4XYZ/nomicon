@@ -1,4 +1,8 @@
+<a id="ownership-and-lifetimes"></a>
+
 # 所有権とライフタイム
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
 所有権は、Rust を際立たせる機能です。ガーベジコレクションを避けながら、Rust が完全なメモリ安全性と効率性を両立できるようにします。所有権システムの詳細に入る前に、この設計が必要とされる理由を考えてみましょう。
 

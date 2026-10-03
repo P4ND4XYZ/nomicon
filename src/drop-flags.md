@@ -1,16 +1,13 @@
-# Drop Flags
+<a id="drop-flags"></a>
 
-The examples in the previous section introduce an interesting problem for Rust.
-We have seen that it's possible to conditionally initialize, deinitialize, and
-reinitialize locations of memory totally safely. For Copy types, this isn't
-particularly notable since they're just a random pile of bits. However types
-with destructors are a different story: Rust needs to know whether to call a
-destructor whenever a variable is assigned to, or a variable goes out of scope.
-How can it do this with conditional initialization?
+# ドロップフラグ
 
-Note that this is not a problem that all assignments need worry about. In
-particular, assigning through a dereference unconditionally drops, and assigning
-in a `let` unconditionally doesn't drop:
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+前の節の例は、Rust にとって興味深い問題を提起しています。
+メモリ位置を条件付きで初期化したり、未初期化に戻したり、再初期化したりすることは、完全に安全に行えると分かりました。`Copy` 型については、単なるビットの集まりなので、これは特に注目することではありません。しかし、デストラクタを持つ型では事情が違います。Rust は、変数への代入や変数がスコープを抜けるたびに、デストラクタを呼び出すべきか知る必要があります。条件付きの初期化では、どうすればよいのでしょうか？
+
+すべての代入でこの問題を心配する必要があるわけではないことに注意してください。特に、参照外しを介した代入は無条件にドロップし、`let` での代入は無条件にドロップしません。
 
 ```rust
 let mut x = Box::new(0); // let makes a fresh variable, so never need to drop
@@ -18,18 +15,11 @@ let y = &mut x;
 *y = Box::new(1); // Deref assumes the referent is initialized, so always drops
 ```
 
-This is only a problem when overwriting a previously initialized variable or
-one of its subfields.
+これが問題になるのは、以前に初期化された変数や、その下位のフィールドの1つを上書きするときだけです。
 
-It turns out that Rust actually tracks whether a type should be dropped or not
-*at runtime*. As a variable becomes initialized and uninitialized, a *drop flag*
-for that variable is toggled. When a variable might need to be dropped, this
-flag is evaluated to determine if it should be dropped.
+実は Rust は、型をドロップすべきかどうかを*実行時に*追跡します。変数が初期化済みになったり未初期化になったりすると、その変数の*ドロップフラグ*が切り替わります。変数をドロップする必要があるかもしれないときは、このフラグを評価して、ドロップすべきか判断します。
 
-Of course, it is often the case that a value's initialization state can be
-statically known at every point in the program. If this is the case, then the
-compiler can theoretically generate more efficient code! For instance, straight-
-line code has such *static drop semantics*:
+もちろん、プログラムのあらゆる地点で値の初期化状態が静的に分かることもよくあります。その場合、理論的にはコンパイラはもっと効率的なコードを生成できます！ 例えば、分岐のないコードには、このような*静的なドロップの意味論*があります。
 
 ```rust
 let mut x = Box::new(0); // x was uninit; just overwrite.
@@ -40,8 +30,7 @@ y = x;                   // y was init; Drop y, overwrite it, and make x uninit!
                          // x goes out of scope; x was uninit; do nothing.
 ```
 
-Similarly, branched code where all branches have the same behavior with respect
-to initialization has static drop semantics:
+同様に、初期化に関してすべての分岐が同じ挙動をする分岐のあるコードにも、静的なドロップの意味論があります。
 
 ```rust
 # let condition = true;
@@ -56,7 +45,7 @@ x = Box::new(0);            // x was uninit; just overwrite.
                             // x goes out of scope; x was init; Drop x!
 ```
 
-However code like this *requires* runtime information to correctly Drop:
+しかし、次のようなコードで正しくドロップするには、実行時の情報が*必要です*。
 
 ```rust
 # let condition = true;
@@ -69,7 +58,7 @@ if condition {
                             // check the flag!
 ```
 
-Of course, in this case it's trivial to retrieve static drop semantics:
+もちろん、この場合は静的なドロップの意味論を取り戻すのは簡単です。
 
 ```rust
 # let condition = true;
@@ -79,5 +68,5 @@ if condition {
 }
 ```
 
-The drop flags are tracked on the stack.
-In old Rust versions, drop flags were stashed in a hidden field of types that implement `Drop`.
+ドロップフラグはスタック上で追跡されます。
+古いバージョンの Rust では、ドロップフラグは `Drop` を実装する型の隠しフィールドに格納されていました。

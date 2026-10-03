@@ -1,21 +1,14 @@
-# Unbounded Lifetimes
+<a id="unbounded-lifetimes"></a>
 
-Unsafe code can often end up producing references or lifetimes out of thin air.
-Such lifetimes come into the world as *unbounded*. The most common source of
-this is taking a reference to a dereferenced raw pointer, which produces a
-reference with an unbounded lifetime. Such a lifetime becomes as big as context
-demands. This is in fact more powerful than simply becoming `'static`, because
-for instance `&'static &'a T` will fail to typecheck, but the unbound lifetime
-will perfectly mold into `&'a &'a T` as needed. However for most intents and
-purposes, such an unbounded lifetime can be regarded as `'static`.
+# 無制限のライフタイム
 
-Almost no reference is `'static`, so this is probably wrong. `transmute` and
-`transmute_copy` are the two other primary offenders. One should endeavor to
-bound an unbounded lifetime as quickly as possible, especially across function
-boundaries.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-Given a function, any output lifetimes that don't derive from inputs are
-unbounded. For instance:
+アンセーフなコードは、何もないところから参照やライフタイムを生み出してしまうことがよくあります。そのようなライフタイムは、*無制限*の状態で生まれます。最もよくある原因は、参照外しした生ポインタの指示先への参照を取ることです。これにより、無制限のライフタイムを持つ参照が生成されます。このライフタイムは、文脈が要求するだけ長くなります。これは実際、単に `'static` になるよりも強力です。たとえば `&'static &'a T` は型検査に通りませんが、無制限のライフタイムは必要に応じて `&'a &'a T` にぴったり適合するからです。ただし、ほとんどの用途では、このような無制限のライフタイムを `'static` とみなせます。
+
+`'static` である参照はほとんどないので、これはおそらく誤りです。ほかの主な原因は `transmute` と `transmute_copy` です。無制限のライフタイムは、できるだけ早く、特に関数の境界を越える際には制限するよう努めるべきです。
+
+ある関数について、入力に由来しない出力ライフタイムはすべて無制限です。たとえば、次のような場合です。
 
 <!-- no_run: This example exhibits undefined behavior. -->
 ```rust,no_run
@@ -31,14 +24,6 @@ fn main() {
 }
 ```
 
-The easiest way to avoid unbounded lifetimes is to use lifetime elision at the
-function boundary. If an output lifetime is elided, then it *must* be bounded by
-an input lifetime. Of course it might be bounded by the *wrong* lifetime, but
-this will usually just cause a compiler error, rather than allow memory safety
-to be trivially violated.
+無制限のライフタイムを避ける最も簡単な方法は、関数の境界でライフタイムを省略することです。出力ライフタイムが省略されているなら、それは入力ライフタイムによって*必ず*制限されます。もちろん、*間違った*ライフタイムによって制限される可能性もあります。しかし通常は、メモリ安全性を簡単に破れるようになるのではなく、コンパイラのエラーになるだけです。
 
-Within a function, bounding lifetimes is more error-prone. The safest and easiest
-way to bound a lifetime is to return it from a function with a bound lifetime.
-However if this is unacceptable, the reference can be placed in a location with
-a specific lifetime. Unfortunately it's impossible to name all lifetimes involved
-in a function.
+関数の内部でライフタイムを制限するのは、より誤りを招きやすくなります。ライフタイムを制限する最も安全で簡単な方法は、制限されたライフタイムを持つ関数の戻り値としてその参照を返すことです。しかし、それが許容できない場合は、特定のライフタイムを持つ場所に参照を格納できます。残念ながら、関数内で関係するすべてのライフタイムに名前を付けることは不可能です。

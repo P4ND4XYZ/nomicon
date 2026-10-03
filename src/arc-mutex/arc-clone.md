@@ -1,68 +1,61 @@
-# Cloning
+<a id="cloning"></a>
 
-Now that we've got some basic code set up, we'll need a way to clone the `Arc`.
+# クローン
 
-Basically, we need to:
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-1. Increment the atomic reference count
-2. Construct a new instance of the `Arc` from the inner pointer
+基本的なコードができたので、`Arc` をクローンする方法が必要です。
 
-First, we need to get access to the `ArcInner`:
+基本的には、次のことが必要です。
+
+1. アトミックな参照カウントを増やします
+2. 内部のポインタから `Arc` の新しいインスタンスを構築します
+
+まず、`ArcInner` にアクセスする必要があります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 let inner = unsafe { self.ptr.as_ref() };
 ```
 
-We can update the atomic reference count as follows:
+アトミックな参照カウントは次のように更新できます。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 let old_rc = inner.rc.fetch_add(1, Ordering::???);
 ```
 
-But what ordering should we use here? We don't really have any code that will
-need atomic synchronization when cloning, as we do not modify the internal value
-while cloning. Thus, we can use a Relaxed ordering here, which implies no
-happens-before relationship but is atomic. When `Drop`ping the Arc, however,
-we'll need to atomically synchronize when decrementing the reference count. This
-is described more in [the section on the `Drop` implementation for
-`Arc`](arc-drop.md). For more information on atomic relationships and Relaxed
-ordering, see [the section on atomics](../atomics.md).
+しかし、ここではどの順序付けを使うべきでしょうか？ クローン中に内部の値を変更しないので、クローン時にアトミックな同期を必要とするコードは特にありません。
+したがって、ここでは Relaxed 順序付けを使えます。これは happens-before 関係を含意しませんが、アトミックです。
+しかし、Arc を `Drop` するときには、参照カウントを減らす際にアトミックに同期する必要があります。
+これについては、[`Arc` の `Drop` 実装の節](arc-drop.md)で詳しく説明します。
+アトミックの関係と Relaxed 順序付けの詳細は、[アトミックの節](../atomics.md)を参照してください。
 
-Thus, the code becomes this:
+したがって、コードは次のようになります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 let old_rc = inner.rc.fetch_add(1, Ordering::Relaxed);
 ```
 
-We'll need to add another import to use `Ordering`:
+`Ordering` を使うために、もう一つインポートを追加する必要があります。
 
 ```rust
 use std::sync::atomic::Ordering;
 ```
 
-However, we have one problem with this implementation right now. What if someone
-decides to `mem::forget` a bunch of Arcs? The code we have written so far (and
-will write) assumes that the reference count accurately portrays how many Arcs
-are in memory, but with `mem::forget` this is false. Thus, when more and more
-Arcs are cloned from this one without them being `Drop`ped and the reference
-count being decremented, we can overflow! This will cause use-after-free which
-is **INCREDIBLY BAD!**
+しかし、現時点のこの実装には一つ問題があります。誰かが大量の Arc を `mem::forget` することにしたらどうなるでしょうか？
+これまで書いた（そしてこれから書く）コードは、参照カウントがメモリ内の Arc の数を正確に表すと仮定していますが、`mem::forget` を使うとこれは成り立ちません。
+したがって、この Arc から次々に Arc がクローンされ、それらが `Drop` されず参照カウントも減らされなければ、オーバーフローする可能性があります！
+これは解放後使用を引き起こし、**極めて深刻な問題です！**
 
-To handle this, we need to check that the reference count does not go over some
-arbitrary value (below `usize::MAX`, as we're storing the reference count as an
-`AtomicUsize`), and do *something*.
+これに対処するには、参照カウントが任意に決めた値（参照カウントを `AtomicUsize` として保存するので `usize::MAX` 未満の値）を超えないことを確認し、*何か*をする必要があります。
 
-The standard library's implementation decides to just abort the program (as it
-is an incredibly unlikely case in normal code and if it happens, the program is
-probably incredibly degenerate) if the reference count reaches `isize::MAX`
-(about half of `usize::MAX`) on any thread, on the assumption that there are
-probably not about 2 billion threads (or about **9 quintillion** on some 64-bit
-machines) incrementing the reference count at once. This is what we'll do.
+標準ライブラリの実装では、どのスレッドであれ参照カウントが `isize::MAX`（`usize::MAX` の約半分）に達したら、単にプログラムを異常終了させることにしています
+（通常のコードでは極めて起こりにくいケースであり、もし起これば、そのプログラムはおそらく極めて異常な状態だからです）。
+これは、約 20 億のスレッド（ある種の 64 ビットマシンでは約 **900 京**）が同時に参照カウントを増やすことはおそらくない、という仮定に基づきます。ここでも同じことをします。
 
-It's pretty simple to implement this behavior:
+この動作の実装はとても単純です。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -71,7 +64,7 @@ if old_rc >= isize::MAX as usize {
 }
 ```
 
-Then, we need to return a new instance of the `Arc`:
+次に、`Arc` の新しいインスタンスを返す必要があります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -81,7 +74,7 @@ Self {
 }
 ```
 
-Now, let's wrap this all up inside the `Clone` implementation:
+では、これらすべてを `Clone` の実装にまとめましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

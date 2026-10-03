@@ -1,21 +1,24 @@
-# Push and Pop
+<a id="push-and-pop"></a>
 
-Alright. We can initialize. We can allocate. Let's actually implement some
-functionality! Let's start with `push`. All it needs to do is check if we're
-full to grow, unconditionally write to the next index, and then increment our
-length.
+# プッシュとポップ
 
-To do the write we have to be careful not to evaluate the memory we want to write
-to. At worst, it's truly uninitialized memory from the allocator. At best it's the
-bits of some old value we popped off. Either way, we can't just index to the memory
-and dereference it, because that will evaluate the memory as a valid instance of
-T. Worse, `foo[idx] = x` will try to call `drop` on the old value of `foo[idx]`!
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-The correct way to do this is with `ptr::write`, which just blindly overwrites the
-target address with the bits of the value we provide. No evaluation involved.
+初期化もアロケートもできるようになりました。実際の機能を実装しましょう！
+まずは `push` です。満杯か確認して必要なら伸長し、無条件に次のインデックスへ書き込み、
+長さを増やすだけです。
 
-For `push`, if the old len (before push was called) is 0, then we want to write
-to the 0th index. So we should offset by the old len.
+書き込む際には、書き込み先のメモリを評価しないよう注意しなければなりません。
+最悪の場合、それはアロケータから得た本当の未初期化メモリです。よくても、以前ポップした
+値のビットが残っています。いずれにせよ、単にインデックスで指定して参照外しすることは
+できません。メモリを T の有効なインスタンスとして評価してしまうからです。
+さらに悪いことに、`foo[idx] = x` は `foo[idx]` の古い値に `drop` を呼ぼうとします！
+
+正しい方法は `ptr::write` を使うことです。これは指定したアドレスを、渡した値のビットで
+そのまま上書きするだけです。評価は行いません。
+
+`push` では、古い len（push を呼ぶ前の値）が0なら、インデックス0に書き込みたいので、
+古い len だけオフセットするべきです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -31,16 +34,15 @@ pub fn push(&mut self, elem: T) {
 }
 ```
 
-Easy! How about `pop`? Although this time the index we want to access is
-initialized, Rust won't just let us dereference the location of memory to move
-the value out, because that would leave the memory uninitialized! For this we
-need `ptr::read`, which just copies out the bits from the target address and
-interprets it as a value of type T. This will leave the memory at this address
-logically uninitialized, even though there is in fact a perfectly good instance
-of T there.
+簡単ですね！では `pop` はどうでしょうか？今回はアクセス先が初期化済みですが、
+Rust はそのメモリ位置を単に参照外しして値をムーブして取り出すことを許しません。
+メモリを未初期化のまま残してしまうからです！そのために `ptr::read` が必要です。
+これは指定したアドレスのビットをコピーして取り出し、T 型の値として解釈するだけです。
+実際には完全に有効な T のインスタンスがそこにあっても、そのアドレスのメモリは
+論理的には未初期化となります。
 
-For `pop`, if the old len is 1, for example, we want to read out of the 0th
-index. So we should offset by the new len.
+`pop` では、例えば古い len が1ならインデックス0から読み出したいので、
+新しい len だけオフセットするべきです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

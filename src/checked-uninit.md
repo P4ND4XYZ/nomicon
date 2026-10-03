@@ -1,8 +1,10 @@
-# Checked Uninitialized Memory
+<a id="checked-uninitialized-memory"></a>
 
-Like C, all stack variables in Rust are uninitialized until a value is
-explicitly assigned to them. Unlike C, Rust statically prevents you from ever
-reading them until you do:
+# チェックされる未初期化メモリ
+
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+C と同様に、Rust のすべてのスタック変数は、明示的に値を代入するまで未初期化です。C と異なり、Rust は代入するまでそれらを読み出すことを静的に防ぎます。
 
 ```rust,compile_fail
 fn main() {
@@ -17,14 +19,9 @@ fn main() {
   |                    ^ use of possibly uninitialized `x`
 ```
 
-This is based off of a basic branch analysis: every branch must assign a value
-to `x` before it is first used. For short, we also say that "`x` is init" or
-"`x` is uninit".
+これは基本的な分岐解析に基づいています。どの分岐でも、`x` が初めて使われる前に値を代入しなければなりません。略して「`x` は init（初期化済み）」や「`x` は uninit（未初期化）」とも言います。
 
-Interestingly, Rust doesn't require the variable
-to be mutable to perform a delayed initialization if every branch assigns
-exactly once. However the analysis does not take advantage of constant analysis
-or anything like that. So this compiles:
+興味深いことに、すべての分岐でちょうど1回代入する場合、Rust は遅延初期化のために変数を可変にすることを要求しません。ただし、この解析は定数解析やそれに類するものを利用しません。そのため、次のコードはコンパイルできます。
 
 ```rust
 fn main() {
@@ -40,7 +37,7 @@ fn main() {
 }
 ```
 
-but this doesn't:
+しかし、次のコードはコンパイルできません。
 
 ```rust,compile_fail
 fn main() {
@@ -58,7 +55,7 @@ fn main() {
   |                    ^ use of possibly uninitialized `x`
 ```
 
-while this does:
+一方、次のコードはコンパイルできます。
 
 ```rust
 fn main() {
@@ -72,9 +69,7 @@ fn main() {
 }
 ```
 
-Of course, while the analysis doesn't consider actual values, it does
-have a relatively sophisticated understanding of dependencies and control
-flow. For instance, this works:
+もちろん、この解析は実際の値を考慮しませんが、依存関係や制御フローを比較的高度に理解しています。例えば、次のコードは動作します。
 
 ```rust
 let x: i32;
@@ -95,8 +90,7 @@ loop {
 println!("{}", x);
 ```
 
-If a value is moved out of a variable, that variable becomes logically
-uninitialized if the type of the value isn't Copy. That is:
+変数から値がムーブされると、その値の型が `Copy` でない場合、変数は論理的に未初期化になります。つまり、次のようになります。
 
 ```rust
 fn main() {
@@ -107,8 +101,7 @@ fn main() {
 }
 ```
 
-However reassigning `y` in this example *would* require `y` to be marked as
-mutable, as a Safe Rust program could observe that the value of `y` changed:
+ただし、この例で `y` に再代入するには、`y` を可変とする必要が*あります*。安全な Rust プログラムでも、`y` の値が変わったことを観測できるためです。
 
 ```rust
 fn main() {
@@ -118,4 +111,4 @@ fn main() {
 }
 ```
 
-Otherwise it's like `y` is a brand new variable.
+それ以外の点では、`y` はまったく新しい変数のように扱われます。

@@ -1,7 +1,10 @@
-# Implementing Arc and Mutex
+<a id="implementing-arc-and-mutex"></a>
 
-Knowing the theory is all fine and good, but the *best* way to understand
-something is to use it. To better understand atomics and interior mutability,
-we'll be implementing versions of the standard library's `Arc` and `Mutex` types.
+# Arc と Mutex の実装
 
-TODO: Write `Mutex` chapters.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
+
+理論を知ることは結構ですが、何かを理解する*最も良い*方法は、それを使うことです。
+アトミックと内部可変性をよりよく理解するために、標準ライブラリの `Arc` 型と `Mutex` 型を実装していきます。
+
+TODO: `Mutex` の章を執筆します。

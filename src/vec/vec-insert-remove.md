@@ -1,16 +1,18 @@
-# Insert and Remove
+<a id="insert-and-remove"></a>
 
-Something *not* provided by slice is `insert` and `remove`, so let's do those
-next.
+# 挿入と削除
 
-Insert needs to shift all the elements at the target index to the right by one.
-To do this we need to use `ptr::copy`, which is our version of C's `memmove`.
-This copies some chunk of memory from one location to another, correctly
-handling the case where the source and destination overlap (which will
-definitely happen here).
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-If we insert at index `i`, we want to shift the `[i .. len]` to `[i+1 .. len+1]`
-using the old len.
+スライスが提供*しない*機能に `insert` と `remove` があるので、次はこれらを実装しましょう。
+
+挿入では、対象のインデックス以降の全要素を右へ1つずらす必要があります。
+そのために、C の `memmove` の Rust 版である `ptr::copy` を使います。
+これはメモリのかたまりをある場所から別の場所へコピーし、コピー元とコピー先が
+重なる場合も正しく扱います（ここでは確実に重なります）。
+
+インデックス `i` に挿入するなら、古い len を使って `[i .. len]` を
+`[i+1 .. len+1]` にずらしたいところです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -34,8 +36,8 @@ pub fn insert(&mut self, index: usize, elem: T) {
 }
 ```
 
-Remove behaves in the opposite manner. We need to shift all the elements from
-`[i+1 .. len + 1]` to `[i .. len]` using the *new* len.
+削除は逆の動作をします。*新しい* len を使い、`[i+1 .. len + 1]` のすべての要素を
+`[i .. len]` へずらす必要があります。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

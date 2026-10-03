@@ -1,14 +1,18 @@
-# Coercions
+<a id="coercions"></a>
 
-Types can implicitly be coerced to change in certain contexts.
-These changes are generally just *weakening* of types, largely focused around pointers and lifetimes.
-They mostly exist to make Rust "just work" in more cases, and are largely harmless.
+# 強制変換
 
-For an exhaustive list of all the types of coercions, see the [Coercion types] section on the reference.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-Note that we do not perform coercions when matching traits (except for receivers, see the [next page][dot-operator]).
-If there is an `impl` for some type `U` and `T` coerces to `U`, that does not constitute an implementation for `T`.
-For example, the following will not type check, even though it is OK to coerce `t` to `&T` and there is an `impl` for `&T`:
+特定の文脈では、暗黙の強制変換によって型を変更できます。
+これらの変更は一般に型を*弱める*だけであり、主にポインタとライフタイムに関するものです。
+主な目的は、より多くの場合に Rust が「そのまま動く」ようにすることであり、大部分は無害です。
+
+強制変換の種類を網羅した一覧については、リファレンスの[強制変換の種類][Coercion types]の節を参照してください。
+
+トレイトの照合では強制変換を行わないことに注意してください（レシーバは例外です。[次のページ][dot-operator]を参照してください）。
+ある型 `U` に対する `impl` があり、`T` が `U` に強制変換されるとしても、それは `T` に対する実装にはなりません。
+例えば、`t` を `&T` に強制変換でき、`&T` に対する `impl` があるにもかかわらず、次の例は型チェックに通りません。
 
 ```rust,compile_fail
 trait Trait {}
@@ -23,7 +27,7 @@ fn main() {
 }
 ```
 
-which fails like as follows:
+次のようなエラーになります。
 
 ```text
 error[E0277]: the trait bound `&mut i32: Trait` is not satisfied

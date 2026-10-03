@@ -1,35 +1,15 @@
-# Poisoning
+<a id="poisoning"></a>
 
-Although all unsafe code *must* ensure it has minimal exception safety, not all
-types ensure *maximal* exception safety. Even if the type does, your code may
-ascribe additional meaning to it. For instance, an integer is certainly
-exception-safe, but has no semantics on its own. It's possible that code that
-panics could fail to correctly update the integer, producing an inconsistent
-program state.
+# ポイズニング
 
-This is *usually* fine, because anything that witnesses an exception is about
-to get destroyed. For instance, if you send a Vec to another thread and that
-thread panics, it doesn't matter if the Vec is in a weird state. It will be
-dropped and go away forever. However some types are especially good at smuggling
-values across the panic boundary.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-These types may choose to explicitly *poison* themselves if they witness a panic.
-Poisoning doesn't entail anything in particular. Generally it just means
-preventing normal usage from proceeding. The most notable example of this is the
-standard library's Mutex type. A Mutex will poison itself if one of its
-MutexGuards (the thing it returns when a lock is obtained) is dropped during a
-panic. Any future attempts to lock the Mutex will return an `Err` or panic.
+すべてのアンセーフコードは最小限の例外安全性を*必ず*保証しなければなりませんが、すべての型が*最大限の*例外安全性を保証するわけではありません。型が保証していても、コードがそれに追加の意味を与えるかもしれません。たとえば、整数は確かに例外安全ですが、それ自体にセマンティクスはありません。パニックするコードが整数を正しく更新し損ねて、整合していないプログラムの状態を生み出す可能性があります。
 
-Mutex poisons not for true safety in the sense that Rust normally cares about. It
-poisons as a safety-guard against blindly using the data that comes out of a Mutex
-that has witnessed a panic while locked. The data in such a Mutex was likely in the
-middle of being modified, and as such may be in an inconsistent or incomplete state.
-It is important to note that one cannot violate memory safety with such a type
-if it is correctly written. After all, it must be minimally exception-safe!
+これは*通常は*問題ありません。例外に直面したものは、どれもまもなく破棄されるからです。たとえば Vec を別のスレッドに送り、そのスレッドがパニックした場合、Vec が奇妙な状態にあっても問題ありません。ドロップされ、永久に消えてしまいます。しかし、一部の型はパニックの境界を越えて値をこっそり持ち出すのが特に得意です。
 
-However if the Mutex contained, say, a BinaryHeap that does not actually have the
-heap property, it's unlikely that any code that uses it will do
-what the author intended. As such, the program should not proceed normally.
-Still, if you're double-plus-sure that you can do *something* with the value,
-the Mutex exposes a method to get the lock anyway. It *is* safe, after all.
-Just maybe nonsense.
+これらの型は、パニックに直面したとき、明示的に自身を*ポイズン*することを選ぶ場合があります。ポイズニングは、特定の何かを必然的に伴うものではありません。一般には、通常の利用が続くのを防ぐというだけの意味です。最も顕著な例は、標準ライブラリの Mutex 型です。Mutex は、その MutexGuard（ロック取得時に返すもの）の1つがパニック中にドロップされると、自身をポイズンします。それ以降、Mutex をロックしようとする試みはすべて、`Err` を返すかパニックします。
+
+Mutex がポイズンするのは、Rust が通常重視する意味での真の安全性のためではありません。ロック中にパニックに直面した Mutex から取り出されるデータを、盲目的に使うことに対する安全装置としてポイズンします。そのような Mutex 内のデータは、変更の途中だった可能性が高く、したがって整合していない状態や不完全な状態にあるかもしれません。このような型が正しく書かれていれば、メモリ安全性を侵害することはできないという点が重要です。結局、最小限の例外安全性を備えていなければならないのです！
+
+しかし、たとえば Mutex の中に、実際にはヒープの性質を満たしていない BinaryHeap があった場合、それを使うコードが作者の意図どおりに動くとは考えにくいです。そのため、プログラムは通常どおり続行すべきではありません。それでも、その値で*何か*ができると絶対の確信があるなら、Mutex は、それでもロックを取得するためのメソッドを公開しています。結局、安全*ではある*のです。ただ、無意味かもしれません。

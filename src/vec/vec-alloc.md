@@ -1,21 +1,24 @@
-# Allocating Memory
+<a id="allocating-memory"></a>
 
-Using `NonNull` throws a wrench in an important feature of Vec (and indeed all of
-the std collections): creating an empty Vec doesn't actually allocate at all. This
-is not the same as allocating a zero-sized memory block, which is not allowed by
-the global allocator (it results in undefined behavior!). So if we can't allocate,
-but also can't put a null pointer in `ptr`, what do we do in `Vec::new`? Well, we
-just put some other garbage in there!
+# メモリのアロケート
 
-This is perfectly fine because we already have `cap == 0` as our sentinel for no
-allocation. We don't even need to handle it specially in almost any code because
-we usually need to check if `cap > len` or `len > 0` anyway. The recommended
-Rust value to put here is `mem::align_of::<T>()`. `NonNull` provides a convenience
-for this: `NonNull::dangling()`. There are quite a few places where we'll
-want to use `dangling` because there's no real allocation to talk about but
-`null` would make the compiler do bad things.
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../../README.md for attribution and licenses. -->
 
-So:
+`NonNull` を使うと、Vec（実際には std のすべてのコレクション）の重要な機能に支障が出ます。
+空の Vec を作っても、実際には何もアロケートしないという機能です。これはサイズ0の
+メモリブロックをアロケートすることとは異なります。後者はグローバルアロケータでは
+許されません（未定義動作になります！）。アロケートできず、`ptr` にヌルポインタも
+入れられないなら、`Vec::new` ではどうすればよいのでしょうか？
+単に別の適当な値を入れればよいのです！
+
+これはまったく問題ありません。アロケーションがないことを表す番兵として、すでに
+`cap == 0` があるからです。通常はどのみち `cap > len` や `len > 0` を確認する必要が
+あるため、ほとんどのコードで特別に扱う必要すらありません。Rust でここに入れる値として
+推奨されるのは `mem::align_of::<T>()` です。`NonNull` はそのための便利な機能、
+`NonNull::dangling()` を提供しています。実際のアロケーションはないものの、
+`null` を使うとコンパイラが悪さをするため、`dangling` を使いたい場所はかなりあります。
+
+したがって、こうなります。
 
 <!-- ignore: explanation code -->
 ```rust,ignore
@@ -34,33 +37,30 @@ impl<T> Vec<T> {
 # fn main() {}
 ```
 
-I slipped in that assert there because zero-sized types will require some
-special handling throughout our code, and I want to defer the issue for now.
-Without this assert, some of our early drafts will do some Very Bad Things.
+このアサートを入れたのは、サイズ0の型にはコード全体で特別な扱いが必要となり、
+今はその問題を後回しにしたいからです。このアサートがなければ、初期の実装案の一部で
+非常にまずいことが起こります。
 
-Next we need to figure out what to actually do when we *do* want space. For that,
-we use the global allocation functions [`alloc`][alloc], [`realloc`][realloc],
-and [`dealloc`][dealloc] which are available in stable Rust in
-[`std::alloc`][std_alloc]. These functions are expected to become deprecated in
-favor of the methods of [`std::alloc::Global`][Global] after this type is stabilized.
+次に、領域が*本当に*必要なときに何をすべきかを考えます。そのために、安定版 Rust の
+[`std::alloc`][std_alloc] で利用できるグローバルアロケーション関数
+[`alloc`][alloc]、[`realloc`][realloc]、[`dealloc`][dealloc] を使います。
+これらの関数は、[`std::alloc::Global`][Global] が安定化された後、その型のメソッドに
+置き換わって非推奨になると見込まれています。
 
-We'll also need a way to handle out-of-memory (OOM) conditions. The standard
-library provides a function [`alloc::handle_alloc_error`][handle_alloc_error],
-which will abort the program in a platform-specific manner.
-The reason we abort and don't panic is because unwinding can cause allocations
-to happen, and that seems like a bad thing to do when your allocator just came
-back with "hey I don't have any more memory".
+メモリ不足（out-of-memory、OOM）に対処する方法も必要です。標準ライブラリは
+[`alloc::handle_alloc_error`][handle_alloc_error] 関数を提供しており、
+プラットフォーム固有の方法でプログラムをアボートします。
+パニックではなくアボートするのは、巻き戻しによってアロケーションが起こりうるからです。
+アロケータが「もうメモリがありません」と返してきた直後にそれをするのは、まずそうです。
 
-Of course, this is a bit silly since most platforms don't actually run out of
-memory in a conventional way. Your operating system will probably kill the
-application by another means if you legitimately start using up all the memory.
-The most likely way we'll trigger OOM is by just asking for ludicrous quantities
-of memory at once (e.g. half the theoretical address space). As such it's
-*probably* fine to panic and nothing bad will happen. Still, we're trying to be
-like the standard library as much as possible, so we'll just kill the whole
-program.
+もちろん、ほとんどのプラットフォームでは従来の意味で実際にメモリ不足になるわけでは
+ないので、これは少しばかげています。本当にすべてのメモリを使い始めたなら、
+OS はおそらく別の手段でアプリケーションを終了させます。OOM を引き起こす最もありそうな
+方法は、途方もない量のメモリ（例えば理論上のアドレス空間の半分）を一度に要求することです。
+したがって、パニックしても*おそらく*問題はなく、悪いことは起こらないでしょう。
+それでも、できるだけ標準ライブラリに似せたいので、プログラム全体を終了させます。
 
-Okay, now we can write growing. Roughly, we want to have this logic:
+これで伸長処理を書けます。おおよそ、次のロジックが必要です。
 
 ```text
 if cap == 0:
@@ -71,17 +71,16 @@ else:
     cap *= 2
 ```
 
-But Rust's only supported allocator API is so low level that we'll need to do a
-fair bit of extra work. We also need to guard against some special
-conditions that can occur with really large allocations or empty allocations.
+しかし、Rust がサポートする唯一のアロケータ API は非常に低レベルなので、
+かなりの追加作業が必要です。非常に大きなアロケーションや空のアロケーションで
+起こりうる特殊な状況にも備える必要があります。
 
-In particular, `ptr::offset` will cause us a lot of trouble, because it has
-the semantics of LLVM's GEP inbounds instruction. If you're fortunate enough to
-not have dealt with this instruction, here's the basic story with GEP: alias
-analysis, alias analysis, alias analysis. It's super important to an optimizing
-compiler to be able to reason about data dependencies and aliasing.
+特に `ptr::offset` は多くの問題を引き起こします。LLVM の GEP inbounds 命令の
+意味論を持っているからです。幸運にもこの命令を扱ったことがない方に、GEP の要点を
+お伝えすると、エイリアス解析、エイリアス解析、エイリアス解析です。最適化コンパイラに
+とって、データの依存関係とエイリアシングを推論できることは非常に重要です。
 
-As a simple example, consider the following fragment of code:
+簡単な例として、次のコード片を考えてみましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -89,79 +88,70 @@ As a simple example, consider the following fragment of code:
 *y *= 3;
 ```
 
-If the compiler can prove that `x` and `y` point to different locations in
-memory, the two operations can in theory be executed in parallel (by e.g.
-loading them into different registers and working on them independently).
-However the compiler can't do this in general because if x and y point to
-the same location in memory, the operations need to be done to the same value,
-and they can't just be merged afterwards.
+`x` と `y` がメモリ上の異なる場所を指すとコンパイラが証明できれば、理論上は
+2つの操作を並列に実行できます（例えば別々のレジスタに読み込み、独立に処理します）。
+しかし一般にはそうできません。x と y がメモリ上の同じ場所を指している場合、
+同じ値に対して操作する必要があり、後から単に結果を統合することはできないからです。
 
-When you use GEP inbounds, you are specifically telling LLVM that the offsets
-you're about to do are within the bounds of a single "allocated" entity. The
-ultimate payoff being that LLVM can assume that if two pointers are known to
-point to two disjoint objects, all the offsets of those pointers are *also*
-known to not alias (because you won't just end up in some random place in
-memory). LLVM is heavily optimized to work with GEP offsets, and inbounds
-offsets are the best of all, so it's important that we use them as much as
-possible.
+GEP inbounds を使うと、これから行うオフセット操作が単一の「アロケートされた」実体の
+境界内に収まることを LLVM に明示的に伝えます。最終的な利点は、2つのポインタが
+互いに重ならない2つのオブジェクトを指すと分かっていれば、それらをオフセットした
+すべてのポインタ*も*エイリアスではないと LLVM が仮定できることです
+（メモリ上の無関係な場所に行き着くことはないからです）。LLVM は GEP オフセットを
+扱うよう強く最適化されており、inbounds オフセットはその中でも最良なので、
+できるだけ使うことが重要です。
 
-So that's what GEP's about, how can it cause us trouble?
+GEP については以上ですが、どのように問題を引き起こすのでしょうか？
 
-The first problem is that we index into arrays with unsigned integers, but
-GEP (and as a consequence `ptr::offset`) takes a signed integer. This means
-that half of the seemingly valid indices into an array will overflow GEP and
-actually go in the wrong direction! As such we must limit all allocations to
-`isize::MAX` elements. This actually means we only need to worry about
-byte-sized objects, because e.g. `> isize::MAX` `u16`s will truly exhaust all of
-the system's memory. However in order to avoid subtle corner cases where someone
-reinterprets some array of `< isize::MAX` objects as bytes, std limits all
-allocations to `isize::MAX` bytes.
+最初の問題は、配列のインデックスには符号なし整数を使うのに、GEP
+（したがって `ptr::offset`）は符号付き整数を取ることです。一見有効な配列インデックスの
+半分が GEP でオーバーフローし、実際には逆方向へ進んでしまいます！したがって、
+すべてのアロケーションを `isize::MAX` 要素までに制限しなければなりません。
+実際にはバイトサイズのオブジェクトだけを心配すればよいことになります。例えば
+`isize::MAX` 個より多い `u16` は、本当にシステムのメモリをすべて使い果たすからです。
+しかし、`isize::MAX` 個未満のオブジェクトの配列をバイト列として再解釈するような
+微妙なコーナーケースを避けるため、std はすべてのアロケーションを `isize::MAX` バイトに
+制限しています。
 
-On all 64-bit targets that Rust currently supports we're artificially limited
-to significantly less than all 64 bits of the address space (modern x64
-platforms only expose 48-bit addressing), so we can rely on just running out of
-memory first. However on 32-bit targets, particularly those with extensions to
-use more of the address space (PAE x86 or x32), it's theoretically possible to
-successfully allocate more than `isize::MAX` bytes of memory.
+Rust が現在サポートするすべての64ビットターゲットでは、アドレス空間の全64ビットより
+はるかに少ない範囲に人為的に制限されています（現代の x64 プラットフォームは
+48ビットのアドレス指定しか公開していません）。そのため、先にメモリ不足になると
+考えてよいのです。しかし32ビットターゲット、特により広いアドレス空間を使う拡張のある
+ターゲット（PAE x86 や x32）では、理論上、`isize::MAX` バイトを超えるメモリの
+アロケートに成功する可能性があります。
 
-However since this is a tutorial, we're not going to be particularly optimal
-here, and just unconditionally check, rather than use clever platform-specific
-`cfg`s.
+ただしこれはチュートリアルなので、ここでは特に最適化を追求せず、プラットフォーム固有の
+巧妙な `cfg` を使う代わりに無条件で確認します。
 
-The other corner-case we need to worry about is empty allocations. There will
-be two kinds of empty allocations we need to worry about: `cap = 0` for all T,
-and `cap > 0` for zero-sized types.
+もう1つ注意すべきコーナーケースは空のアロケーションです。注意すべきものは2種類あります。
+すべての T に対する `cap = 0` と、サイズ0の型に対する `cap > 0` です。
 
-These cases are tricky because they come
-down to what LLVM means by "allocated". LLVM's notion of an
-allocation is significantly more abstract than how we usually use it. Because
-LLVM needs to work with different languages' semantics and custom allocators,
-it can't really intimately understand allocation. Instead, the main idea behind
-allocation is "doesn't overlap with other stuff". That is, heap allocations,
-stack allocations, and globals don't randomly overlap. Yep, it's about alias
-analysis. As such, Rust can technically play a bit fast and loose with the notion of
-an allocation as long as it's *consistent*.
+これらは、LLVM が「アロケートされた」という言葉で何を意味するかに帰着するため、
+厄介です。LLVM のアロケーションの概念は、普段私たちが使う意味よりもかなり抽象的です。
+LLVM は異なる言語の意味論やカスタムアロケータを扱う必要があるため、アロケーションを
+詳しく理解することはできません。代わりに、その中心的な考えは「他のものと重ならない」
+というものです。つまり、ヒープアロケーション、スタックアロケーション、グローバルな値は
+無作為に重なりません。そう、エイリアス解析の話です。したがって、*一貫している*限り、
+Rust は技術的にはアロケーションの概念を少し緩く扱うことができます。
 
-Getting back to the empty allocation case, there are a couple of places where
-we want to offset by 0 as a consequence of generic code. The question is then:
-is it consistent to do so? For zero-sized types, we have concluded that it is
-indeed consistent to do a GEP inbounds offset by an arbitrary number of
-elements. This is a runtime no-op because every element takes up no space,
-and it's fine to pretend that there's infinite zero-sized types allocated
-at `0x01`. No allocator will ever allocate that address, because they won't
-allocate `0x00` and they generally allocate to some minimal alignment higher
-than a byte. Also generally the whole first page of memory is
-protected from being allocated anyway (a whole 4k, on many platforms).
+空のアロケーションに戻ると、ジェネリックなコードの結果として、0だけオフセットしたい
+場所がいくつかあります。そこで問題になるのは、それが一貫した扱いかどうかです。
+サイズ0の型については、任意の要素数だけ GEP inbounds オフセットを行っても、
+確かに一貫していると結論付けました。どの要素も領域を使わないため、これは実行時には
+no-op（何もしない操作）です。`0x01` にサイズ0の型が無限にアロケートされていると
+みなしても問題ありません。どのアロケータもそのアドレスをアロケートすることはありません。
+`0x00` をアロケートすることはなく、通常は1バイトより大きい何らかの最小アラインメントに
+合わせてアロケートするからです。また一般に、メモリの最初のページ全体
+（多くのプラットフォームでは4k全体）は、そもそもアロケートできないよう保護されています。
 
-However what about for positive-sized types? That one's a bit trickier. In
-principle, you can argue that offsetting by 0 gives LLVM no information: either
-there's an element before the address or after it, but it can't know which.
-However we've chosen to conservatively assume that it may do bad things. As
-such we will guard against this case explicitly.
+ではサイズが正の型はどうでしょうか？こちらは少し厄介です。原理的には、0だけ
+オフセットしても LLVM に情報は与えないと論じられます。アドレスの前か後ろのどちらかに
+要素があるとしても、どちらかは分からないからです。しかし私たちは保守的に、悪いことが
+起こるかもしれないと仮定することにしました。したがって、この場合を明示的に防ぎます。
 
-*Phew*
+*ふう*
 
-Ok with all the nonsense out of the way, let's actually allocate some memory:
+これでややこしい話は片付いたので、実際にメモリをアロケートしましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore

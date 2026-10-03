@@ -1,23 +1,20 @@
 # #[panic_handler]
 
-`#[panic_handler]` is used to define the behavior of `panic!` in `#![no_std]` applications.
-The `#[panic_handler]` attribute must be applied to a function with signature `fn(&PanicInfo)
--> !` and such function must appear *once* in the dependency graph of a binary / dylib / cdylib
-crate. The API of `PanicInfo` can be found in the [API docs].
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
+
+`#[panic_handler]` は、`#![no_std]` アプリケーションでの `panic!` の動作を定義するために使用します。
+`#[panic_handler]` 属性は、シグネチャが `fn(&PanicInfo)
+-> !` の関数に適用しなければならず、そのような関数は binary / dylib / cdylib クレートの依存関係グラフに*一度だけ*現れなければなりません。`PanicInfo` の API は [API ドキュメント][API docs]で確認できます。
 
 [API docs]: ../core/panic/struct.PanicInfo.html
 
-Given that `#![no_std]` applications have no *standard* output and that some `#![no_std]`
-applications, e.g. embedded applications, need different panicking behaviors for development and for
-release it can be helpful to have panic crates, crate that only contain a `#[panic_handler]`.
-This way applications can easily swap the panicking behavior by simply linking to a different panic
-crate.
+`#![no_std]` アプリケーションには*標準*出力がなく、また、組み込みアプリケーションなど一部の `#![no_std]` アプリケーションでは、開発時とリリース時で異なるパニック動作が必要なので、パニッククレート、すなわち `#[panic_handler]` だけを含むクレートを用意すると便利な場合があります。
+こうすれば、アプリケーションは別のパニッククレートにリンクするだけで、パニック時の動作を簡単に切り替えられます。
 
-Below is shown an example where an application has a different panicking behavior depending on
-whether is compiled using the dev profile (`cargo build`) or using the release profile (`cargo build
---release`).
+以下に、dev プロファイル（`cargo build`）でコンパイルするか、release プロファイル（`cargo build
+--release`）でコンパイルするかによって、アプリケーションのパニック時の動作が異なる例を示します。
 
-`panic-semihosting` crate -- log panic messages to the host stderr using semihosting:
+`panic-semihosting` クレート -- セミホスティングを使ってホストの stderr にパニックメッセージを記録します。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -50,7 +47,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 ```
 
-`panic-halt` crate -- halt the thread on panic; messages are discarded:
+`panic-halt` クレート -- パニック時にスレッドを停止します。メッセージは破棄されます。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -64,7 +61,7 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 ```
 
-`app` crate:
+`app` クレート:
 
 <!-- ignore: requires the above crates -->
 ```rust,ignore

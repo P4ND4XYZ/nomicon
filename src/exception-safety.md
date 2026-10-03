@@ -1,39 +1,26 @@
-# Exception Safety
+<a id="exception-safety"></a>
 
-Although programs should use unwinding sparingly, there's a lot of code that
-*can* panic. If you unwrap a None, index out of bounds, or divide by 0, your
-program will panic. On debug builds, every arithmetic operation can panic
-if it overflows. Unless you are very careful and tightly control what code runs,
-pretty much everything can unwind, and you need to be ready for it.
+# 例外安全性
 
-Being ready for unwinding is often referred to as *exception safety*
-in the broader programming world. In Rust, there are two levels of exception
-safety that one may concern themselves with:
+<!-- Japanese translation of rust-lang/nomicon at 5791ca9f5d671328af7a8fe87b42ca90c7211d28; prose modified. See ../README.md for attribution and licenses. -->
 
-* In unsafe code, we *must* be exception safe to the point of not violating
-  memory safety. We'll call this *minimal* exception safety.
+プログラムでは巻き戻しを控えめに使うべきですが、パニックする*可能性のある*コードはたくさんあります。None をアンラップしたり、範囲外のインデックスでアクセスしたり、0 で割ったりすると、プログラムはパニックします。デバッグビルドでは、どの算術演算もオーバーフローすればパニックする可能性があります。細心の注意を払い、どのコードを実行するか厳密に制御しない限り、ほぼ何でも巻き戻す可能性があり、それに備える必要があります。
 
-* In safe code, it is *good* to be exception safe to the point of your program
-  doing the right thing. We'll call this *maximal* exception safety.
+巻き戻しに備えていることは、より広いプログラミングの世界では、しばしば*例外安全性*と呼ばれます。Rust には、考慮すべき例外安全性のレベルが2つあります。
 
-As is the case in many places in Rust, Unsafe code must be ready to deal with
-bad Safe code when it comes to unwinding. Code that transiently creates
-unsound states must be careful that a panic does not cause that state to be
-used. Generally this means ensuring that only non-panicking code is run while
-these states exist, or making a guard that cleans up the state in the case of
-a panic. This does not necessarily mean that the state a panic witnesses is a
-fully coherent state. We need only guarantee that it's a *safe* state.
+* アンセーフコードでは、メモリ安全性を侵害しない程度の例外安全性を*必ず*備えなければなりません。
+  これを*最小限の*例外安全性と呼びます。
 
-Most Unsafe code is leaf-like, and therefore fairly easy to make exception-safe.
-It controls all the code that runs, and most of that code can't panic. However
-it is not uncommon for Unsafe code to work with arrays of temporarily
-uninitialized data while repeatedly invoking caller-provided code. Such code
-needs to be careful and consider exception safety.
+* 安全なコードでは、プログラムが正しいことを行う程度の例外安全性を備えるのが*望ましい*です。
+  これを*最大限の*例外安全性と呼びます。
+
+Rust の多くの場面と同じく、巻き戻しについても、アンセーフコードは誤った安全なコードに対処する準備が必要です。一時的に不健全な状態を作るコードは、パニックによってその状態が使われないよう注意しなければなりません。一般には、そのような状態が存在する間はパニックしないコードだけが実行されることを保証するか、パニック時に状態を後始末するガードを作ることを意味します。これは、パニック時に見える状態が完全に整合した状態であることを必ずしも意味しません。*安全な*状態であることだけを保証すればよいのです。
+
+ほとんどのアンセーフコードは葉に相当するため、例外安全にするのは比較的簡単です。実行されるコードをすべて制御しており、その大部分はパニックしません。しかし、アンセーフコードが呼び出し側の提供するコードを繰り返し呼び出しながら、一時的に未初期化のデータの配列を扱うことも珍しくありません。そのようなコードは注意を払い、例外安全性を考慮する必要があります。
 
 ## Vec::push_all
 
-`Vec::push_all` is a temporary hack to get extending a Vec by a slice reliably
-efficient without specialization. Here's a simple implementation:
+`Vec::push_all` は、特殊化なしに、スライスによる Vec の拡張を確実に効率よく行うための一時的なハックです。単純な実装を示します。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -54,24 +41,15 @@ impl<T: Clone> Vec<T> {
 }
 ```
 
-We bypass `push` in order to avoid redundant capacity and `len` checks on the
-Vec that we definitely know has capacity. The logic is totally correct, except
-there's a subtle problem with our code: it's not exception-safe! `set_len`,
-`add`, and `write` are all fine; `clone` is the panic bomb we over-looked.
+容量があると確実にわかっている Vec に対する、冗長な容量と `len` の検査を避けるため、`push` を経由しません。ロジックは完全に正しいのですが、コードには微妙な問題があります。例外安全ではないのです！ `set_len`、`add`、`write` はすべて問題ありません。`clone` が、見落としていたパニックの爆弾です。
 
-Clone is completely out of our control, and is totally free to panic. If it
-does, our function will exit early with the length of the Vec set too large. If
-the Vec is looked at or dropped, uninitialized memory will be read!
+Clone はまったくこちらの制御下になく、自由にパニックできます。そうなると、この関数は Vec の長さを大きすぎる値に設定したまま早期に終了します。Vec が参照されたりドロップされたりすると、未初期化メモリが読み出されます！
 
-The fix in this case is fairly simple. If we want to guarantee that the values
-we *did* clone are dropped, we can set the `len` every loop iteration. If we
-just want to guarantee that uninitialized memory can't be observed, we can set
-the `len` after the loop.
+この場合の修正は比較的簡単です。*実際に*クローンした値がドロップされることを保証したければ、ループの各イテレーションで `len` を設定できます。未初期化メモリが観測できないことだけを保証したければ、ループの後で `len` を設定できます。
 
 ## BinaryHeap::sift_up
 
-Bubbling an element up a heap is a bit more complicated than extending a Vec.
-The pseudocode is as follows:
+要素をヒープ内で上に移動させるのは、Vec を拡張するより少し複雑です。擬似コードは次のとおりです。
 
 ```text
 bubble_up(heap, index):
@@ -80,9 +58,7 @@ bubble_up(heap, index):
         index = parent(index)
 ```
 
-A literal transcription of this code to Rust is totally fine, but has an annoying
-performance characteristic: the `self` element is swapped over and over again
-uselessly. We would rather have the following:
+このコードをそのまま Rust に書き換えても問題ありませんが、厄介な性能上の特性があります。`self` の要素が無駄に何度も交換されます。むしろ次のようにしたいところです。
 
 ```text
 bubble_up(heap, index):
@@ -93,15 +69,9 @@ bubble_up(heap, index):
     heap[index] = elem
 ```
 
-This code ensures that each element is copied as little as possible (it is in
-fact necessary that elem be copied twice in general). However it now exposes
-some exception safety trouble! At all times, there exists two copies of one
-value. If we panic in this function something will be double-dropped.
-Unfortunately, we also don't have full control of the code: that comparison is
-user-defined!
+このコードは、各要素ができるだけ少ない回数だけコピーされることを保証します（実際、一般には elem を2回コピーする必要があります）。しかし、今度は例外安全性の問題が現れます！ 常に、ある1つの値のコピーが2つ存在します。この関数でパニックすると、何かが二重にドロップされます。残念ながら、コードも完全には制御できません。この比較はユーザー定義なのです！
 
-Unlike Vec, the fix isn't as easy here. One option is to break the user-defined
-code and the unsafe code into two separate phases:
+Vec と違って、ここでの修正はそれほど簡単ではありません。1つの方法は、ユーザー定義コードとアンセーフコードを、別々の2段階に分けることです。
 
 ```text
 bubble_up(heap, index):
@@ -116,16 +86,11 @@ bubble_up(heap, index):
     heap[index] = elem
 ```
 
-If the user-defined code blows up, that's no problem anymore, because we haven't
-actually touched the state of the heap yet. Once we do start messing with the
-heap, we're working with only data and functions that we trust, so there's no
-concern of panics.
+ユーザー定義コードが破綻しても、もはや問題ありません。まだ実際にはヒープの状態に触れていないからです。ヒープの操作を始めてからは、信頼するデータと関数だけを扱うため、パニックの心配はありません。
 
-Perhaps you're not happy with this design. Surely it's cheating! And we have
-to do the complex heap traversal *twice*! Alright, let's bite the bullet. Let's
-intermix untrusted and unsafe code *for reals*.
+この設計には不満があるかもしれません。確かにずるい方法です！ しかも複雑なヒープの走査を*2回*行わなければなりません！ では、覚悟を決めましょう。信頼できないコードとアンセーフコードを*本当に*混ぜてみましょう。
 
-If Rust had `try` and `finally` like in Java, we could do the following:
+Rust に Java のような `try` と `finally` があれば、次のようにできるでしょう。
 
 ```text
 bubble_up(heap, index):
@@ -138,16 +103,9 @@ bubble_up(heap, index):
         heap[index] = elem
 ```
 
-The basic idea is simple: if the comparison panics, we just toss the loose
-element in the logically uninitialized index and bail out. Anyone who observes
-the heap will see a potentially *inconsistent* heap, but at least it won't
-cause any double-drops! If the algorithm terminates normally, then this
-operation happens to coincide precisely with how we finish up regardless.
+基本的な考え方は単純です。比較がパニックしたら、取り出してある要素を論理的に未初期化のインデックスの位置に戻して、脱出するだけです。ヒープを観測すると、*整合していない*可能性のあるヒープが見えますが、少なくとも二重ドロップは起こりません！ アルゴリズムが正常に終了するなら、この操作は、いずれにしても最後に行う処理とちょうど一致します。
 
-Sadly, Rust has no such construct, so we're going to need to roll our own! The
-way to do this is to store the algorithm's state in a separate struct with a
-destructor for the "finally" logic. Whether we panic or not, that destructor
-will run and clean up after us.
+残念ながら Rust にはそのような構文がないので、自分で作る必要があります！ その方法は、「finally」のロジックを行うデストラクタを持つ別の構造体に、アルゴリズムの状態を格納することです。パニックしてもしなくても、そのデストラクタが実行され、後始末をしてくれます。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
