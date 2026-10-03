@@ -165,7 +165,7 @@ legacy_path = "src/exception-safety.md"
 issues = []
 
 [files."src/exotic-sizes.md"]
-status = "not-started"
+status = "translated"
 source_sha256 = "6760b5084bcd771186edd4be24329db5b647a447267dacbad95d59b168101482"
 legacy_path = "src/exotic-sizes.md"
 issues = []
@@ -418,10 +418,10 @@ I = ["src/ffi.md", "src/beneath-std.md", "src/panic-handler.md"]
 [progress]
 phase = "stage-2"
 active_group = "B"
-active_batch = "B-1"
-active_files = ["src/data.md", "src/repr-rust.md"]
+active_batch = "B-2"
+active_files = ["src/exotic-sizes.md"]
 batch_state = "complete"
 next_group = "B"
-next_batch = "B-2"
-next_files = ["src/exotic-sizes.md"]
-checkpoint = "Stage 1 and its independent review are complete. The user approved continuing to Stage 2. Source commit is 5791ca9f5d671328af7a8fe87b42ca90c7211d28; Japanese reference commit is 1b23982de81bab6174f6e202f30437f315274ccd; TranslationTable commit is 2eaecee7a369fa354d6c3fe7e27d7332a74514ed. User confirmed Rustnomicon spelling is acceptable. Translate from the fixed English source; old Japanese files are terminology/reference only. Use polite Japanese, preserve executable code/fences/hidden lines/links, record open questions, and update file statuses after each batch. Group A batch A-1 (meet-safe-and-unsafe, safe-unsafe-meaning, working-with-unsafe) is translated and validated, but not independently reviewed; retain status translated. Group B batch B-1 (data.md, repr-rust.md) is translated and validated, not independently reviewed; retain status translated. The old repr-rust translation contains stale claims and a malformed Optiona example, so use only the fixed source. Next process exotic-sizes.md alone as B-2, then other-reprs.md alone as B-3. Preserve the existing dynamically-sized-types-dsts link target when translating the DST heading. User requested compaction above 8%, but no manual compaction operation or context-usage indicator is available; persist this checkpoint before continuing. The user also authorized creating a new branch and committing at a coherent checkpoint; this validated B-1 checkpoint is ready for branch translation/rustonomicon-ja-stage2."
+next_batch = "B-3"
+next_files = ["src/other-reprs.md"]
+checkpoint = "Stage 1 and its independent review are complete. The user approved continuing to Stage 2. Source commit is 5791ca9f5d671328af7a8fe87b42ca90c7211d28; Japanese reference commit is 1b23982de81bab6174f6e202f30437f315274ccd; TranslationTable commit is 2eaecee7a369fa354d6c3fe7e27d7332a74514ed. User confirmed Rustnomicon spelling is acceptable. Translate from the fixed English source; old Japanese files are terminology/reference only. Use polite Japanese, preserve executable code/fences/hidden lines/links, record open questions, and update file statuses after each batch. Group A batch A-1 (meet-safe-and-unsafe, safe-unsafe-meaning, working-with-unsafe) is translated and validated, but not independently reviewed; retain status translated. Group B batch B-1 (data.md, repr-rust.md) is translated and validated, not independently reviewed; retained status translated and committed as 6b34115 on branch translation/rustonomicon-ja-stage2. Group B batch B-2 (exotic-sizes.md) is translated and validated, not independently reviewed; retain status translated. Japanese headings change generated fragments, so preserve inbound links with explicit anchors dynamically-sized-types-dsts and zero-sized-types-zsts. The first full linkcheck exposed two inbound links to the ZST fragment; after adding its anchor, linkcheck passed with zero errors. Next process other-reprs.md alone as B-3. User requested compaction above 8%, but no manual compaction operation or context-usage indicator is available; persist this checkpoint before continuing."

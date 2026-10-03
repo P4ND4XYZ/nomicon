@@ -1,48 +1,33 @@
-# Exotically Sized Types
+# 特殊なサイズの型
 
-Most of the time, we expect types to have a statically known and positive size.
-This isn't always the case in Rust.
+ほとんどの場合、型は静的に分かる正のサイズを持つものと考えます。しかし、Rust では必ずしもそうとは限りません。
 
-## Dynamically Sized Types (DSTs)
+<a id="dynamically-sized-types-dsts"></a>
 
-Rust supports Dynamically Sized Types (DSTs): types without a statically
-known size or alignment. On the surface, this is a bit nonsensical: Rust *must*
-know the size and alignment of something in order to correctly work with it! In
-this regard, DSTs are not normal types. Since they lack a statically known
-size, these types can only exist behind a pointer. Any pointer to a
-DST consequently becomes a *wide* pointer consisting of the pointer and the
-information that "completes" them (more on this below).
+## 動的サイズ型（DST）
 
-There are two major DSTs exposed by the language:
+Rust は動的サイズ型（DST）をサポートしています。DST とは、サイズやアラインメントが静的に分からない型です。一見すると、これは少し筋が通らないように思えます。Rust が何かを正しく扱うには、そのサイズとアラインメントを知らなければならないはずです。この点で、DST は通常の型とは異なります。サイズが静的に分からないため、DST はポインタを介してのみ存在できます。そのため、DST を指すポインタは、ポインタ本体と、それを「完成させる」情報からなる*ワイドポインタ*になります（詳しくは後述します）。
 
-* trait objects: `dyn MyTrait`
-* slices: [`[T]`][slice], [`str`], and others
+言語が公開している主な DST は2種類あります。
 
-A trait object represents some type that implements the traits it specifies.
-The exact original type is *erased* in favor of runtime reflection
-with a vtable containing all the information necessary to use the type.
-The information that completes a trait object pointer is the vtable pointer.
-The runtime size of the pointee can be dynamically requested from the vtable.
+* トレイトオブジェクト: `dyn MyTrait`
+* スライス: [`[T]`][slice]、[`str`] など
 
-A slice is simply a view into some contiguous storage -- typically an array or
-`Vec`. The information that completes a slice pointer is just the number of elements
-it points to. The runtime size of the pointee is just the statically known size
-of an element multiplied by the number of elements.
+トレイトオブジェクトは、指定されたトレイトを実装する何らかの型を表します。元の具体的な型は*消去*され、その型を使うために必要な情報すべてを含む vtable による実行時リフレクションに置き換えられます。トレイトオブジェクトへのポインタを完成させる情報は、vtable へのポインタです。指示先の実行時サイズは、vtable から動的に取得できます。
 
-Structs can actually store a single DST directly as their last field, but this
-makes them a DST as well:
+スライスは、連続した記憶領域（通常は配列か `Vec`）への単なるビューです。スライスへのポインタを完成させる情報は、そのポインタが指す要素の数だけです。指示先の実行時サイズは、静的に分かっている要素のサイズに要素数を掛けたものです。
+
+構造体は、最後のフィールドとして1つの DST を直接格納できますが、その構造体自体も DST になります。
 
 ```rust
-// Can't be stored on the stack directly
+// スタックに直接置くことはできません
 struct MySuperSlice {
     info: u32,
     data: [u8],
 }
 ```
 
-Unfortunately, such a type is largely useless without a way to construct it. Currently the
-only properly supported way to create a custom DST is by making your type generic
-and performing an *unsizing coercion*:
+残念ながら、このような型は構築する方法がなければ、ほとんど役に立ちません。現在、独自の DST を作成する方法として適切にサポートされているのは、型をジェネリックにし、*アンサイズ化強制変換*を行う方法だけです。
 
 ```rust
 struct MySuperSliceable<T: ?Sized> {
@@ -58,121 +43,73 @@ fn main() {
 
     let dynamic: &MySuperSliceable<[u8]> = &sized;
 
-    // prints: "17 [0, 0, 0, 0, 0, 0, 0, 0]"
+    // 出力: "17 [0, 0, 0, 0, 0, 0, 0, 0]"
     println!("{} {:?}", dynamic.info, &dynamic.data);
 }
 ```
 
-(Yes, custom DSTs are a largely half-baked feature for now.)
+（はい、独自 DST は今のところ、かなり未完成な機能です。）
 
-## Zero Sized Types (ZSTs)
+<a id="zero-sized-types-zsts"></a>
 
-Rust also allows types to be specified that occupy no space:
+## サイズ0の型（ZST）
+
+Rust では、領域をまったく占めない型も定義できます。
 
 ```rust
-struct Nothing; // No fields = no size
+struct Nothing; // フィールドなし = サイズ0
 
-// All fields have no size = no size
+// すべてのフィールドがサイズ0 = サイズ0
 struct LotsOfNothing {
     foo: Nothing,
-    qux: (),      // empty tuple has no size
-    baz: [u8; 0], // empty array has no size
+    qux: (),      // 空タプルはサイズ0
+    baz: [u8; 0], // 空配列はサイズ0
 }
 ```
 
-On their own, Zero Sized Types (ZSTs) are, for obvious reasons, pretty useless.
-However as with many curious layout choices in Rust, their potential is realized
-in a generic context: Rust largely understands that any operation that produces
-or stores a ZST can be reduced to a no-op. First off, storing it doesn't even
-make sense -- it doesn't occupy any space. Also there's only one value of that
-type, so anything that loads it can just produce it from the aether -- which is
-also a no-op since it doesn't occupy any space.
+サイズ0の型（ZST）は、それだけでは明らかな理由から、あまり役に立ちません。しかし、Rust の興味深いレイアウト上の選択肢の多くと同様、ZST の可能性はジェネリックな文脈で発揮されます。Rust は、ZST を生成または格納する操作を、ほぼ何もしない操作（no-op）にできると認識しています。まず、ZST は領域を占めないため、格納すること自体に意味がありません。また、その型の値は1つしかないため、読み込み操作では、その値を虚空から生成できます。これも領域を占めないので no-op です。
 
-One of the most extreme examples of this is Sets and Maps. Given a
-`Map<Key, Value>`, it is common to implement a `Set<Key>` as just a thin wrapper
-around `Map<Key, UselessJunk>`. In many languages, this would necessitate
-allocating space for UselessJunk and doing work to store and load UselessJunk
-only to discard it. Proving this unnecessary would be a difficult analysis for
-the compiler.
+この最も極端な例の1つが、集合とマップです。`Map<Key, Value>` があるとき、`Set<Key>` を `Map<Key, UselessJunk>` の薄いラッパーとして実装するのはよくあることです。多くの言語では、`UselessJunk` のために領域を確保し、結局は捨てる値を格納・読み込みする作業が必要になります。それが不要だと証明するのは、コンパイラにとって難しい解析でしょう。
 
-However in Rust, we can just say that  `Set<Key> = Map<Key, ()>`. Now Rust
-statically knows that every load and store is useless, and no allocation has any
-size. The result is that the monomorphized code is basically a custom
-implementation of a HashSet with none of the overhead that HashMap would have to
-support values.
+しかし Rust では、単に `Set<Key> = Map<Key, ()>` とできます。すると Rust は、読み込みも格納もすべて無意味であり、アロケーションのサイズも0だと静的に認識します。その結果、単相化後のコードは、値をサポートするために `HashMap` が必要とするオーバーヘッドなしで、基本的には独自実装の `HashSet` になります。
 
-Safe code need not worry about ZSTs, but *unsafe* code must be careful about the
-consequence of types with no size. In particular, pointer offsets are no-ops,
-and allocators typically [require a non-zero size][alloc].
+安全なコードは ZST を心配する必要はありませんが、*アンセーフな*コードでは、サイズのない型がもたらす結果に注意しなければなりません。特に、ポインタのオフセットは no-op になり、アロケータは通常[ゼロでないサイズを要求します][alloc]。
 
-Note that references to ZSTs (including empty slices), just like all other
-references, must be non-null and suitably aligned. However, loading or storing
-through a null pointer to a ZST is not [undefined behavior][ub], unlike
-pointers to other types.
+ZST（空スライスを含む）への参照は、ほかのすべての参照と同様、ヌルではなく、適切にアラインされていなければなりません。しかし、ZST へのヌルポインタを介して読み書きしても、ほかの型へのポインタとは異なり、[未定義動作][ub]にはなりません。
 
-[alloc]: ../std/alloc/trait.GlobalAlloc.html#tymethod.alloc
-[ub]: what-unsafe-does.html
+## 空型
 
-## Empty Types
-
-Rust also enables types to be declared that *cannot even be instantiated*. These
-types can only be talked about at the type level, and never at the value level.
-Empty types can be declared by specifying an enum with no variants:
+Rust では、*インスタンス化すらできない*型も宣言できます。この型について語れるのは型レベルだけで、値レベルでは扱えません。空型は、バリアントのない enum として宣言できます。
 
 ```rust
-enum Void {} // No variants = EMPTY
+enum Void {} // バリアントなし = 空
 ```
 
-Empty types are even more marginal than ZSTs. The primary motivating example for
-an empty type is type-level unreachability. For instance, suppose an API needs to
-return a Result in general, but a specific case actually is infallible. It's
-actually possible to communicate this at the type level by returning a
-`Result<T, Void>`. Consumers of the API can confidently unwrap such a Result
-knowing that it's *statically impossible* for this value to be an `Err`, as
-this would require providing a value of type `Void`.
+空型は ZST よりもさらに特殊です。空型を導入する主な動機は、型レベルで到達不能性を表すことです。たとえば、一般には `Result` を返す必要がある API でも、特定のケースでは失敗しないとします。その事実は `Result<T, Void>` を返すことで、型レベルで伝えられます。`Void` 型の値を渡す必要があるため、この値が `Err` になるのは*静的に不可能*だと分かり、API の利用者は安心してその `Result` をアンラップできます。
 
-In principle, Rust can do some interesting analyses and optimizations based
-on this fact. For instance, `Result<T, Void>` is represented as just `T`,
-because the `Err` case doesn't actually exist (strictly speaking, this is only
-an optimization that is not guaranteed, so for example transmuting one into the
-other is still Undefined Behavior).
-
-The following also compiles:
+原理的には、この事実に基づいて Rust が興味深い解析や最適化を行えます。たとえば、`Err` ケースは実際には存在しないため、`Result<T, Void>` は `T` だけとして表現されます（厳密には、これは保証されていない最適化にすぎないため、たとえば両者を `transmute` することは依然として未定義動作です）。次のコードもコンパイルできます。
 
 ```rust
 enum Void {}
 
 let res: Result<u32, Void> = Ok(0);
 
-// Err doesn't exist anymore, so Ok is actually irrefutable.
+// Err はもう存在しないため、Ok パターンは反駁不能です。
 let Ok(num) = res;
 ```
 
-One final subtle detail about empty types is that raw pointers to them are
-actually valid to construct, but dereferencing them is Undefined Behavior
-because that wouldn't make sense.
+空型について最後に、少し微妙な点を挙げます。空型への生ポインタを構築すること自体は有効ですが、それを参照外しするのは未定義動作です。実際、そのような操作には意味がないからです。
 
-We recommend against modelling C's `void*` type with `*const Void`.
-A lot of people started doing that but quickly ran into trouble because
-Rust doesn't really have any safety guards against trying to instantiate
-empty types with unsafe code, and if you do it, it's Undefined Behavior.
-This was especially problematic because developers had a habit of converting
-raw pointers to references and `&Void` is *also* Undefined Behavior to
-construct.
+C の `void*` 型を `*const Void` で表すことは推奨しません。そうする人は多くいましたが、すぐに問題に直面しました。Rust には、アンセーフなコードで空型の値をインスタンス化しようとすることへの安全策がほとんどなく、実際にインスタンス化すると未定義動作になるためです。特に問題なのは、生ポインタを参照に変換する習慣があったことです。`&Void` を構築することも*未定義動作*です。
 
-`*const ()` (or equivalent) works reasonably well for `void*`, and can be made
-into a reference without any safety problems. It still doesn't prevent you from
-trying to read or write values, but at least it compiles to a no-op instead
-of Undefined Behavior.
+`*const ()`（または同等の型）は `void*` として十分に使え、安全性の問題なく参照にできます。値を読み書きしようとすることまでは防げませんが、少なくとも未定義動作ではなく no-op にコンパイルされます。
 
-## Extern Types
+## extern 型
 
-There is [an accepted RFC][extern-types] to add proper types with an unknown size,
-called *extern types*, which would let Rust developers model things like C's `void*`
-and other "declared but never defined" types more accurately. However as of
-Rust 2018, [the feature is stuck in limbo over how `size_of_val::<MyExternType>()`
-should behave][extern-types-issue].
+サイズが不明な適切な型（*extern 型*）を追加し、C の `void*` や「宣言されているが定義されていない」型をより正確にモデル化できるようにする[採択済み RFC][extern-types]があります。しかし Rust 2018 時点では、`size_of_val::<MyExternType>()` がどう振る舞うべきかをめぐって、[この機能は宙ぶらりんの状態です][extern-types-issue]。
 
+[alloc]: ../std/alloc/trait.GlobalAlloc.html#tymethod.alloc
+[ub]: what-unsafe-does.html
 [extern-types]: https://github.com/rust-lang/rfcs/blob/master/text/1861-extern-types.md
 [extern-types-issue]: https://github.com/rust-lang/rust/issues/43467
 [`str`]: ../std/primitive.str.html

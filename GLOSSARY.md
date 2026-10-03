@@ -48,6 +48,15 @@
 | null pointer optimization | ヌルポインタ最適化 | ヌルにならないポインタ型を利用した enum レイアウト最適化です。 |
 | non-nullable | ヌルにならない | ポインタが null にならない性質を指します。 |
 | dynamically sized type (DST) | 動的サイズ型（DST） | サイズがコンパイル時に決まらない型です。 |
+| zero-sized type (ZST) | サイズ0の型（ZST） | サイズが0の型です。 |
+| empty type | 空型 | 値を1つも持たず、インスタンス化できない型です。 |
+| wide pointer | ワイドポインタ | DST のメタデータを伴うポインタです。 |
+| pointee | ポインタの指示先 | ポインタが指す値・型を指します。 |
+| trait object | トレイトオブジェクト | `dyn Trait` の形で使う型消去された値です。 |
+| unsizing coercion | アンサイズ化強制変換 | サイズ付き型から DST への coercion です。 |
+| no-op | no-op（何もしない操作） | 実行しても効果のない操作です。 |
+| extern type | extern 型 | 外部で定義されるサイズ不明の型です。 |
+| irrefutable pattern | 反駁不能パターン | 常にマッチするパターンです。 |
 | vector / Vec | ベクタ / `Vec` | 一般名は「ベクタ」、Rust の型名は `Vec` のままです。 |
 
 ## 表記上の注意
