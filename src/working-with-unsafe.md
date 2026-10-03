@@ -1,8 +1,6 @@
-# Working with Unsafe
+# アンセーフコードとの付き合い方
 
-Rust generally only gives us the tools to talk about Unsafe Rust in a scoped and
-binary manner. Unfortunately, reality is significantly more complicated than
-that. For instance, consider the following toy function:
+Rust がアンセーフな Rust を扱うために提供する手段は、一般に、スコープを区切り、安全かアンセーフかを二分して扱うものです。残念ながら、現実はそれよりずっと複雑です。たとえば、次の簡単な関数を考えてみてください。
 
 ```rust
 fn index(idx: usize, arr: &[u8]) -> Option<u8> {
@@ -16,14 +14,9 @@ fn index(idx: usize, arr: &[u8]) -> Option<u8> {
 }
 ```
 
-This function is safe and correct. We check that the index is in bounds, and if
-it is, index into the array in an unchecked manner. We say that such a correct
-unsafely implemented function is *sound*, meaning that safe code cannot cause
-Undefined Behavior through it (which, remember, is the single fundamental
-property of Safe Rust).
+この関数は安全で、正しいものです。インデックスが範囲内かを確認し、範囲内であれば、チェックなしで配列をインデックス参照します。このような、アンセーフに実装されていても正しい関数を*健全*と呼びます。これは、この関数を通じて安全なコードが未定義動作を引き起こせないという意味です（覚えているとおり、これが安全な Rust の唯一の基本的な性質です）。
 
-But even in such a trivial function, the scope of the unsafe block is
-questionable. Consider changing the `<` to a `<=`:
+しかし、このような自明な関数でさえ、`unsafe` ブロックのスコープには疑問が残ります。`<` を `<=` に変えてみてください。
 
 ```rust
 fn index(idx: usize, arr: &[u8]) -> Option<u8> {
@@ -37,37 +30,28 @@ fn index(idx: usize, arr: &[u8]) -> Option<u8> {
 }
 ```
 
-This program is now *unsound*, Safe Rust can cause Undefined Behavior, and yet
-*we only modified safe code*. This is the fundamental problem of safety: it's
-non-local. The soundness of our unsafe operations necessarily depends on the
-state established by otherwise "safe" operations.
+このプログラムは不健全になり、安全な Rust から未定義動作を引き起こせます。それでも、*変更したのは安全なコードだけです*。これが安全性の根本的な問題です。安全性は非局所的なのです。アンセーフな操作の健全性は、必然的に、ほかの点では「安全」な操作によって確立された状態に依存します。
 
-Safety is modular in the sense that opting into unsafety doesn't require you
-to consider arbitrary other kinds of badness. For instance, doing an unchecked
-index into a slice doesn't mean you suddenly need to worry about the slice being
-null or containing uninitialized memory. Nothing fundamentally changes. However
-safety *isn't* modular in the sense that programs are inherently stateful and
-your unsafe operations may depend on arbitrary other state.
+アンセーフを選んだからといって、ほかのあらゆる種類の問題まで考慮する必要はない、という意味では、安全性はモジュール化されています。たとえば、スライスをチェックなしでインデックス参照しても、そのスライスがヌルであるとか、未初期化メモリを含むといったことまで突然心配する必要はありません。根本的に何かが変わるわけではありません。しかし、プログラムは本質的に状態を持ち、アンセーフな操作がほかの任意の状態に依存し得る、という意味では、安全性はモジュール化されていません。
 
-This non-locality gets much worse when we incorporate actual persistent state.
-Consider a simple implementation of `Vec`:
+実際に持続する状態が加わると、この非局所性はさらに大きくなります。`Vec` の簡単な実装を考えてみましょう。
 
 ```rust
 use std::ptr;
 
-// Note: This definition is naive. See the chapter on implementing Vec.
+// 注: この定義は素朴なものです。Vec の実装に関する章を参照してください。
 pub struct Vec<T> {
     ptr: *mut T,
     len: usize,
     cap: usize,
 }
 
-// Note this implementation does not correctly handle zero-sized types.
-// See the chapter on implementing Vec.
+// 注: この実装はサイズが0の型を正しく扱いません。
+// Vec の実装に関する章を参照してください。
 impl<T> Vec<T> {
     pub fn push(&mut self, elem: T) {
         if self.len == self.cap {
-            // not important for this example
+            // この例では重要ではありません。
             self.reallocate();
         }
         unsafe {
@@ -81,40 +65,24 @@ impl<T> Vec<T> {
 # fn main() {}
 ```
 
-This code is simple enough to reasonably audit and informally verify. Now consider
-adding the following method:
+このコードは十分に単純なので、妥当な範囲で監査し、非形式的に検証できます。では、次のメソッドを追加することを考えてみましょう。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
 fn make_room(&mut self) {
-    // grow the capacity
+    // 容量を増やす
     self.cap += 1;
 }
 ```
 
-This code is 100% Safe Rust but it is also completely unsound. Changing the
-capacity violates the invariants of Vec (that `cap` reflects the allocated space
-in the Vec). This is not something the rest of Vec can guard against. It *has*
-to trust the capacity field because there's no way to verify it.
+このコードは100%安全な Rust ですが、完全に不健全でもあります。容量を変更すると、`Vec` の不変条件（`cap` は `Vec` に割り当てられた領域を表す）が破られます。これは `Vec` の残りの部分では防げません。容量を検証する方法がないため、残りの部分は `cap` フィールドを信頼するしか*ありません*。
 
-Because it relies on invariants of a struct field, this `unsafe` code
-does more than pollute a whole function: it pollutes a whole *module*.
-Generally, the only bullet-proof way to limit the scope of unsafe code is at the
-module boundary with privacy.
+構造体フィールドの不変条件に依存するため、この `unsafe` コードの影響は関数全体にとどまらず、*モジュール全体*に及びます。一般に、`unsafe` コードのスコープを確実に限定する唯一の方法は、非公開性を使ってモジュール境界で区切ることです。
 
-However this works *perfectly*. The existence of `make_room` is *not* a
-problem for the soundness of Vec because we didn't mark it as public. Only the
-module that defines this function can call it. Also, `make_room` directly
-accesses the private fields of Vec, so it can only be written in the same module
-as Vec.
+しかし、この方法は*完璧に*機能します。`make_room` を `pub` にしていないため、その存在は `Vec` の健全性を損ないません。この関数を呼び出せるのは、それを定義したモジュールだけです。また、`make_room` は `Vec` の非公開フィールドに直接アクセスするため、`Vec` と同じモジュール内でしか書けません。
 
-It is therefore possible for us to write a completely safe abstraction that
-relies on complex invariants. This is *critical* to the relationship between
-Safe Rust and Unsafe Rust.
+したがって、複雑な不変条件に依存する、完全に安全な抽象化を書くことができます。これは、安全な Rust とアンセーフな Rust の関係において*極めて*重要です。
 
-We have already seen that Unsafe code must trust *some* Safe code, but shouldn't
-trust *generic* Safe code. Privacy is important to unsafe code for similar reasons:
-it prevents us from having to trust all the safe code in the universe from messing
-with our trusted state.
+すでに見たように、アンセーフなコードは*ある特定の*安全なコードを信頼する必要がありますが、*任意の*安全なコードを信頼してはなりません。プライバシーがアンセーフなコードにとって重要なのも同じ理由です。信頼している状態を、世の中のあらゆる安全なコードが変更できると仮定せずに済むようにしてくれます。
 
-Safety lives!
+安全性は健在です！

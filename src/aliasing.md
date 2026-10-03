@@ -1,24 +1,18 @@
-# Aliasing
+# エイリアシング
 
-First off, let's get some important caveats out of the way:
+まず、重要な注意点をいくつか確認しておきます。
 
-* We will be using the broadest possible definition of aliasing for the sake
-of discussion. Rust's definition will probably be more restricted to factor
-in mutations and liveness.
+* 説明のため、エイリアシングを可能な限り広く定義します。Rust における定義は、変更と生存性を考慮するため、おそらくより制限されたものになります。
 
-* We will be assuming a single-threaded, interrupt-free, execution. We will also
-be ignoring things like memory-mapped hardware. Rust assumes these things
-don't happen unless you tell it otherwise. For more details, see the
-[Concurrency Chapter](concurrency.html).
+* 単一スレッドで割り込みのない実行を前提とします。また、メモリマップドハードウェアなども考慮しません。Rust は、特に指示されない限り、こうしたことは起きないものと仮定します。詳しくは[並行性の章](concurrency.html)を参照してください。
 
-With that said, here's our working definition: variables and pointers *alias*
-if they refer to overlapping regions of memory.
+ここでは、変数とポインタが重なり合うメモリ領域を指しているとき、それらは*エイリアスしている*と定義します。
 
-## Why Aliasing Matters
+## エイリアシングが重要な理由
 
-So why should we care about aliasing?
+なぜエイリアシングを気にする必要があるのでしょうか。
 
-Consider this simple function:
+次の単純な関数を考えてみてください。
 
 ```rust
 fn compute(input: &u32, output: &mut u32) {
@@ -28,19 +22,19 @@ fn compute(input: &u32, output: &mut u32) {
     if *input > 5 {
         *output *= 2;
     }
-    // remember that `output` will be `2` if `input > 10`
+    // `input > 10` なら `output` は `2` になることを覚えておいてください
 }
 ```
 
-We would *like* to be able to optimize it to the following function:
+これを、次の関数のように最適化できると望ましいでしょう。
 
 ```rust
 fn compute(input: &u32, output: &mut u32) {
-    let cached_input = *input; // keep `*input` in a register
+    let cached_input = *input; // `*input` をレジスタに保持する
     if cached_input > 10 {
-        // If the input is greater than 10, the previous code would set the output to 1 and then double it,
-        // resulting in an output of 2 (because `>10` implies `>5`).
-        // Here, we avoid the double assignment and just set it directly to 2.
+        // 入力が 10 より大きい場合、元のコードは出力を 1 に設定してから 2 倍にし、
+        // 出力を 2 にします（`>10` なら `>5` でもあるためです）。
+        // ここでは二度代入せず、直接 2 を設定します。
         *output = 2;
     } else if cached_input > 5 {
         *output *= 2;
@@ -48,20 +42,16 @@ fn compute(input: &u32, output: &mut u32) {
 }
 ```
 
-In Rust, this optimization should be sound. For almost any other language, it
-wouldn't be (barring global analysis). This is because the optimization relies
-on knowing that aliasing doesn't occur, which most languages are fairly liberal
-with. Specifically, we need to worry about function arguments that make `input`
-and `output` overlap, such as `compute(&x, &mut x)`.
+Rust ではこの最適化は健全であるはずです。ほかのほとんどの言語では（プログラム全体を解析しない限り）そうではありません。この最適化は、エイリアシングが起こらないと分かっていることに依存していますが、ほとんどの言語ではエイリアシングをかなり自由に認めているからです。具体的には、`compute(&x, &mut x)` のように `input` と `output` が重なり合う関数引数を考慮する必要があります。
 
-With that input, we could get this execution:
+この引数を渡すと、次のような実行があり得ます。
 
 <!-- ignore: expanded code -->
 ```rust,ignore
-                    //  input ==  output == 0xabad1dea
+                    // input == output == 0xabad1dea
                     // *input == *output == 20
-if *input > 10 {    // true  (*input == 20)
-    *output = 1;    // also overwrites *input, because they are the same
+if *input > 10 {    // true (*input == 20)
+    *output = 1;    // 同じ場所を指すため、*input も上書きします
 }
 if *input > 5 {     // false (*input == 1)
     *output *= 2;
@@ -69,41 +59,26 @@ if *input > 5 {     // false (*input == 1)
                     // *input == *output == 1
 ```
 
-Our optimized function would produce `*output == 2` for this input, so the
-correctness of our optimization relies on this input being impossible.
+この入力では、最適化後の関数は `*output == 2` を生成するため、最適化の正しさはこの入力が不可能であることに依存します。
 
-In Rust we know this input should be impossible because `&mut` isn't allowed to be
-aliased. So we can safely reject its possibility and perform this optimization.
-In most other languages, this input would be entirely possible, and must be considered.
+Rust では、`&mut` はエイリアスしてはならないため、この入力は起こり得ないと分かっています。したがって、この可能性を安全に排除して最適化できます。ほとんどのほかの言語では、この入力は十分に起こり得るため、考慮しなければなりません。
 
-This is why alias analysis is important: it lets the compiler perform useful
-optimizations! Some examples:
+これがエイリアス解析が重要な理由です。コンパイラに有用な最適化を可能にします。たとえば、次のようなものです。
 
-* keeping values in registers by proving no pointers access the value's memory
-* eliminating reads by proving some memory hasn't been written to since last we read it
-* eliminating writes by proving some memory is never read before the next write to it
-* moving or reordering reads and writes by proving they don't depend on each other
+* ポインタが値のメモリにアクセスしないと証明して、値をレジスタに保持する
+* あるメモリが最後に読み取られてから書き込まれていないと証明して、読み取りを取り除く
+* 次の書き込みまであるメモリが読み取られないと証明して、書き込みを取り除く
+* 読み取りと書き込みが互いに依存していないと証明して、それらを移動または並べ替える
 
-These optimizations also tend to prove the soundness of bigger optimizations
-such as loop vectorization, constant propagation, and dead code elimination.
+こうした最適化は、ループのベクトル化、定数伝播、デッドコード除去など、より大きな最適化の健全性を証明する助けにもなります。
 
-In the previous example, we used the fact that `&mut u32` can't be aliased to prove
-that writes to `*output` can't possibly affect `*input`. This lets us cache `*input`
-in a register, eliminating a read.
+先ほどの例では、`&mut u32` はエイリアスし得ないという事実を使い、`*output` への書き込みが `*input` に影響し得ないことを証明しました。これにより `*input` をレジスタにキャッシュでき、読み取りを一度取り除けます。
 
-By caching this read, we knew that the write in the `> 10` branch couldn't
-affect whether we take the `> 5` branch, allowing us to also eliminate a
-read-modify-write (doubling `*output`) when `*input > 10`.
+この読み取りをキャッシュしたことで、`> 10` の分岐での書き込みが `> 5` の分岐を実行するかどうかに影響しないと分かりました。そのため、`*input > 10` のときに読み取り・変更・書き込み（`*output` を 2 倍にする処理）も取り除けます。
 
-The key thing to remember about alias analysis is that writes are the primary
-hazard for optimizations. That is, the only thing that prevents us
-from moving a read to any other part of the program is the possibility of us
-re-ordering it with a write to the same location.
+エイリアス解析で覚えておくべき重要な点は、書き込みが最適化における主な危険要因だということです。つまり、同じ場所への書き込みと順序を入れ替える可能性があることだけが、読み取りをプログラム内の別の場所へ移動する妨げになります。
 
-For instance, we have no concern for aliasing in the following modified version
-of our function, because we've moved the only write to `*output` to the very
-end of our function. This allows us to freely reorder the reads of `*input` that
-occur before it:
+たとえば、次のように関数を変更し、`*output` への唯一の書き込みを関数の最後に移動すれば、エイリアシングを心配する必要はありません。これにより、その前にある `*input` の読み取りを自由に並べ替えられます。
 
 ```rust
 fn compute(input: &u32, output: &mut u32) {
@@ -118,17 +93,8 @@ fn compute(input: &u32, output: &mut u32) {
 }
 ```
 
-We're still relying on alias analysis to assume that `input` doesn't alias
-`temp`, but the proof is much simpler: the value of a local variable can't be
-aliased by things that existed before it was declared. This is an assumption
-every language freely makes, and so this version of the function could be
-optimized the way we want in any language.
+それでも `input` が `temp` をエイリアスしないというエイリアス解析の仮定には依存していますが、証明はずっと簡単です。ローカル変数の値は、その変数が宣言される前から存在していたものによってエイリアスされることはありません。これはどの言語でも自由に仮定できることであり、したがって、この関数はどの言語でも望みどおりに最適化できます。
 
-This is why the definition of "alias" that Rust will use likely involves some
-notion of liveness and mutation: we don't actually care if aliasing occurs if
-there aren't any actual writes to memory happening.
+このため、Rust が使う「エイリアス」の定義には、おそらく生存性と変更の概念が含まれます。実際のメモリ書き込みが起きないなら、エイリアシングが起きるかどうかは問題ではないからです。
 
-Of course, a full aliasing model for Rust must also take into consideration things like
-function calls (which may mutate things we don't see), raw pointers (which have
-no aliasing requirements on their own), and UnsafeCell (which lets the referent
-of an `&` be mutated).
+もちろん、Rust のエイリアシングモデルを完全に定めるには、関数呼び出し（見えないところで変更を行う可能性があります）、それ自体にはエイリアシング要件のない生ポインタ、そして `&` が指す先の変更を可能にする `UnsafeCell` なども考慮しなければなりません。

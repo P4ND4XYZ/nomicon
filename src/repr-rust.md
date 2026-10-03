@@ -1,35 +1,22 @@
 # repr(Rust)
 
-First and foremost, all types have an alignment specified in bytes. The
-alignment of a type specifies what addresses are valid to store the value at. A
-value with alignment `n` must only be stored at an address that is a multiple of
-`n`. So alignment 2 means you must be stored at an even address, and 1 means
-that you can be stored anywhere. Alignment is at least 1, and always a power
-of 2.
+まず何よりも、すべての型にはバイト単位で指定されたアラインメントがあります。型のアラインメントは、その値を格納できる有効なアドレスを定めます。アラインメントが `n` の値は、`n` の倍数であるアドレスにのみ格納しなければなりません。したがって、アラインメント2なら偶数アドレスに格納する必要があり、1ならどこにでも格納できます。アラインメントは1以上で、常に2のべき乗です。
 
-Primitives are usually aligned to their size, although this is
-platform-specific behavior. For example, on x86 `u64` and `f64` are often
-aligned to 4 bytes (32 bits).
+プリミティブ型は通常、そのサイズに合わせてアラインされますが、これはプラットフォームに依存する挙動です。たとえば x86 では、`u64` と `f64` は4バイト（32ビット）にアラインされることがよくあります。
 
-A type's size must always be a multiple of its alignment (Zero being a valid size
-for any alignment). This ensures that an array of that type may always be indexed
-by offsetting by a multiple of its size. Note that the size and alignment of a
-type may not be known statically in the case of [dynamically sized types][dst].
+型のサイズは常にアラインメントの倍数でなければなりません（サイズ0も、どのアラインメントに対しても有効です）。これにより、その型の配列を、サイズの倍数だけオフセットして常にインデックス参照できます。[動的サイズ型][dst]の場合、型のサイズとアラインメントは静的に分からないことがあります。
 
-Rust gives you the following ways to lay out composite data:
+Rust では、複合データを次の方法でレイアウトできます。
 
-* structs (named product types)
-* tuples (anonymous product types)
-* arrays (homogeneous product types)
-* enums (named sum types -- tagged unions)
-* unions (untagged unions)
+* 構造体（名前付き直積型）
+* タプル（名前なし直積型）
+* 配列（同種の直積型）
+* enum（名前付き直和型、つまりタグ付き共用体）
+* union（タグなし共用体）
 
-An enum is said to be *field-less* if none of its variants have associated data.
+どのバリアントも関連データを持たない enum は、*フィールドレス*であると言います。
 
-By default, composite structures have an alignment equal to the maximum
-of their fields' alignments. Rust will consequently insert padding where
-necessary to ensure that all fields are properly aligned and that the overall
-type's size is a multiple of its alignment. For instance:
+デフォルトでは、複合型のアラインメントはフィールドのアラインメントの最大値になります。そのため Rust は、すべてのフィールドが適切にアラインされ、型全体のサイズがそのアラインメントの倍数になるよう、必要に応じてパディングを挿入します。たとえば、次のような型では、
 
 ```rust
 struct A {
@@ -39,21 +26,19 @@ struct A {
 }
 ```
 
-will be 32-bit aligned on a target that aligns these primitives to their
-respective sizes. The whole struct will therefore have a size that is a multiple
-of 32-bits. It may become:
+これらのプリミティブ型をそれぞれのサイズに合わせてアラインするターゲットでは、型全体が32ビットにアラインされます。そのため構造体全体のサイズは32ビットの倍数になります。次のようになる可能性があります。
 
 ```rust
 struct A {
     a: u8,
-    _pad1: [u8; 3], // to align `b`
+    _pad1: [u8; 3], // `b` をアラインするため
     b: u32,
     c: u16,
-    _pad2: [u8; 2], // to make overall size multiple of 4
+    _pad2: [u8; 2], // 全体のサイズを4の倍数にするため
 }
 ```
 
-or maybe:
+または、次のようになるかもしれません。
 
 ```rust
 struct A {
@@ -64,10 +49,7 @@ struct A {
 }
 ```
 
-There is *no indirection* for these types; all data is stored within the struct,
-as you would expect in C. However with the exception of arrays (which are
-densely packed and in-order), the layout of data is not specified by default.
-Given the two following struct definitions:
+これらの型に*間接参照はありません*。C と同様、すべてのデータは構造体の内部に格納されます。しかし、密に詰められ順序も保たれる配列を除き、データのレイアウトはデフォルトでは規定されていません。次の2つの構造体定義を考えてみましょう。
 
 ```rust
 struct A {
@@ -81,15 +63,11 @@ struct B {
 }
 ```
 
-Rust *does* guarantee that two instances of A have their data laid out in
-exactly the same way. However Rust *does not* currently guarantee that an
-instance of A has the same field ordering or padding as an instance of B.
+Rust は、`A` の2つのインスタンスでデータがまったく同じようにレイアウトされることを*保証します*。しかし現時点では、`A` のインスタンスと `B` のインスタンスでフィールドの順序やパディングが同じになることを*保証していません*。
 
-With A and B as written, this point would seem to be pedantic, but several other
-features of Rust make it desirable for the language to play with data layout in
-complex ways.
+この `A` と `B` の例だけを見ると、これは細かすぎる指摘に思えるかもしれません。しかし、Rust のほかの機能を考えると、言語がデータレイアウトを複雑な方法で変えられることが望ましくなります。
 
-For instance, consider this struct:
+たとえば、次の構造体を考えてみましょう。
 
 ```rust
 struct Foo<T, U> {
@@ -99,10 +77,7 @@ struct Foo<T, U> {
 }
 ```
 
-Now consider the monomorphizations of `Foo<u32, u16>` and `Foo<u16, u32>`. If
-Rust lays out the fields in the order specified, we expect it to pad the
-values in the struct to satisfy their alignment requirements. So if Rust
-didn't reorder fields, we would expect it to produce the following:
+次に、`Foo<u32, u16>` と `Foo<u16, u32>` の単相化結果を考えます。Rust が指定された順序のままフィールドをレイアウトするなら、アラインメント要件を満たすために構造体内にパディングを入れることになります。したがって、Rust がフィールドを並べ替えないとすると、次のようになるはずです。
 
 <!-- ignore: explanation code -->
 ```rust,ignore
@@ -121,10 +96,9 @@ struct Foo<u32, u16> {
 }
 ```
 
-The latter case quite simply wastes space. An optimal use of space
-requires different monomorphizations to have *different field orderings*.
+後者は単純に領域を無駄にしています。領域を最適に使うには、単相化ごとに*異なるフィールド順序*が必要です。
 
-Enums make this consideration even more complicated. Naively, an enum such as:
+enum では、この問題はさらに複雑になります。たとえば、次の enum を素朴にレイアウトすると、
 
 ```rust
 enum Foo {
@@ -134,31 +108,19 @@ enum Foo {
 }
 ```
 
-might be laid out as:
+次のようになるかもしれません。
 
 ```rust
 struct FooRepr {
-    data: u64, // this is either a u64, u32, or u8 based on `tag`
-    tag: u8,   // 0 = A, 1 = B, 2 = C
+    data: u64, // `tag` に応じて、u64、u32、u8 のいずれかが入ります
+    tag: u8,   // 0 = A、1 = B、2 = C
 }
 ```
 
-And indeed this is approximately how it would be laid out (modulo the
-size and position of `tag`).
+実際、おおむねこのようなレイアウトになります（ただし `tag` のサイズと位置は別です）。
 
-However there are several cases where such a representation is inefficient. The
-classic case of this is Rust's "null pointer optimization": an enum consisting
-of a single outer unit variant (e.g. `None`) and a (potentially nested) non-
-nullable pointer variant (e.g. `Some(&T)`) makes the tag unnecessary. A null
-pointer can safely be interpreted as the unit (`None`) variant. The net
-result is that, for example, `size_of::<Option<&T>>() == size_of::<&T>()`.
+しかし、この表現が非効率になる場合がいくつかあります。典型例は、Rust の「ヌルポインタ最適化」です。外側に単一のユニットバリアント（たとえば `None`）と、（ネストしている可能性のある）ヌルにならないポインタのバリアント（たとえば `Some(&T)`）を持つ enum では、タグが不要になります。ヌルポインタをユニット（`None`）バリアントとして安全に解釈できるためです。その結果、たとえば `size_of::<Option<&T>>() == size_of::<&T>()` となります。
 
-There are many types in Rust that are, or contain, non-nullable pointers such as
-`Box<T>`, `Vec<T>`, `String`, `&T`, and `&mut T`. Similarly, one can imagine
-nested enums pooling their tags into a single discriminant, as they are by
-definition known to have a limited range of valid values. In principle enums could
-use fairly elaborate algorithms to store bits throughout nested types with
-forbidden values. As such it is *especially* desirable that
-we leave enum layout unspecified today.
+Rust には、`Box<T>`、`Vec<T>`、`String`、`&T`、`&mut T` など、ヌルにならないポインタである型や、それを含む型が数多くあります。同様に、ネストした enum は、取り得る有効な値の範囲が定義上限られているため、複数のタグを1つの判別子にまとめることも考えられます。原理的には、無効な値を持つネスト型の各所にビットを格納する、かなり複雑なアルゴリズムを enum で使うこともできます。そのため、enum のレイアウトを現時点で規定しないでおくことは、*特に*望ましいのです。
 
 [dst]: exotic-sizes.html#dynamically-sized-types-dsts

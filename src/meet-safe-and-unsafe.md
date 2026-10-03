@@ -1,68 +1,40 @@
-# Meet Safe and Unsafe
+# 安全な Rust とアンセーフな Rust
 
-![safe and unsafe](img/safeandunsafe.svg)
+![安全な Rust とアンセーフな Rust](img/safeandunsafe.svg)
 
-It would be great to not have to worry about low-level implementation details.
-Who could possibly care how much space the empty tuple occupies? Sadly, it
-sometimes matters and we need to worry about it. The most common reason
-developers start to care about implementation details is performance, but more
-importantly, these details can become a matter of correctness when interfacing
-directly with hardware, operating systems, or other languages.
+低レベルの実装詳細を気にせずに済めば素晴らしいでしょう。
+空タプルがどれだけの領域を占めるかなど、誰が気にするのでしょうか。
+残念ながら、それが問題になることもあり、気にしなければならない場合があります。
+開発者が実装詳細を気にし始める最も一般的な理由はパフォーマンスですが、さらに重要なのは、ハードウェア、オペレーティングシステム、または他の言語と直接やり取りするときに、こうした詳細が正しさの問題になり得ることです。
 
-When implementation details start to matter in a safe programming language,
-programmers usually have three options:
+安全なプログラミング言語で実装詳細が重要になってきたとき、プログラマには通常、次の3つの選択肢があります。
 
-* fiddle with the code to encourage the compiler/runtime to perform an optimization
-* adopt a more unidiomatic or cumbersome design to get the desired implementation
-* rewrite the implementation in a language that lets you deal with those details
+* コンパイラ／ランタイムが最適化を行うようにコードを調整する
+* 望む実装を得るために、慣用的でない、または煩雑な設計を採用する
+* そうした詳細を扱える言語で実装を書き直す
 
-For that last option, the language programmers tend to use is *C*. This is often
-necessary to interface with systems that only declare a C interface.
+最後の選択肢でプログラマが使いがちな言語は *C* です。C インターフェースしか宣言していないシステムとやり取りするには、これが必要なこともよくあります。
 
-Unfortunately, C is incredibly unsafe to use (sometimes for good reason),
-and this unsafety is magnified when trying to interoperate with another
-language. Care must be taken to ensure C and the other language agree on
-what's happening, and that they don't step on each other's toes.
+残念ながら、C は非常にアンセーフな言語です（それなりの理由がある場合もあります）。ほかの言語と相互運用しようとすると、そのアンセーフさはさらに大きな問題になります。C と相手の言語が何をしているかについて合意していること、そして互いに邪魔し合わないことを注意深く確かめなければなりません。
 
-So what does this have to do with Rust?
+では、これが Rust とどう関係するのでしょうか。
 
-Well, unlike C, Rust is a safe programming language.
+C とは異なり、Rust は安全なプログラミング言語です。
 
-But, like C, Rust is an unsafe programming language.
+しかし、C と同じく、Rust はアンセーフなプログラミング言語でもあります。
 
-More accurately, Rust *contains* both a safe and unsafe programming language.
+より正確には、Rust は安全なプログラミング言語とアンセーフなプログラミング言語の両方を*含んでいます*。
 
-Rust can be thought of as a combination of two programming languages: *Safe
-Rust* and *Unsafe Rust*. Conveniently, these names mean exactly what they say:
-Safe Rust is Safe. Unsafe Rust is, well, not. In fact, Unsafe Rust lets us
-do some *really* unsafe things. Things the Rust authors will implore you not to
-do, but we'll do anyway.
+Rust は、*安全な Rust* と *アンセーフな Rust* という2つのプログラミング言語を組み合わせたものと考えられます。都合のよいことに、この名前は文字どおりの意味です。安全な Rust は安全です。アンセーフな Rust は、まあ、安全ではありません。実際、アンセーフな Rust では*本当に*アンセーフなことができます。Rust の著者たちがやめるよう懇願するようなこともできますが、ここではとにかくやってみます。
 
-Safe Rust is the *true* Rust programming language. If all you do is write Safe
-Rust, you will never have to worry about type-safety or memory-safety. You will
-never endure a dangling pointer, a use-after-free, or any other kind of
-Undefined Behavior (a.k.a. UB).
+安全な Rust こそが、本来の Rust プログラミング言語です。安全な Rust だけを書いていれば、型安全性やメモリ安全性を心配する必要は決してありません。ダングリングポインタや use-after-free、その他いかなる種類の未定義動作（UB）にも、決して遭遇しません。
 
-The standard library also gives you enough utilities out of the box that you'll
-be able to write high-performance applications and libraries in pure idiomatic
-Safe Rust.
+標準ライブラリには、すぐに使える十分なユーティリティも用意されています。それらを使えば、慣用的な安全な Rust だけで、高性能なアプリケーションやライブラリを書けます。
 
-But maybe you want to talk to another language. Maybe you're writing a
-low-level abstraction not exposed by the standard library. Maybe you're
-*writing* the standard library (which is written entirely in Rust). Maybe you
-need to do something the type-system doesn't understand and just *frob some dang
-bits*. Maybe you need Unsafe Rust.
+しかし、ほかの言語とやり取りしたいのかもしれません。標準ライブラリが公開していない低レベル抽象化を書いているのかもしれません。標準ライブラリ自体を書くことになるのかもしれません（標準ライブラリはすべて Rust で書かれています）。型システムが理解できないことをするために、ただ*ビットをいじり回す*必要があるのかもしれません。アンセーフな Rust が必要なのかもしれません。
 
-Unsafe Rust is exactly like Safe Rust with all the same rules and semantics.
-It just lets you do some *extra* things that are Definitely Not Safe
-(which we will define in the next section).
+アンセーフな Rust は、ルールもセマンティクスも安全な Rust とまったく同じです。違うのは、間違いなく安全ではない*追加の*ことができる点だけです（それについては次の節で定義します）。
 
-The value of this separation is that we gain the benefits of using an unsafe
-language like C — low level control over implementation details — without most
-of the problems that come with trying to integrate it with a completely
-different safe language.
+この分離の価値は、C のようなアンセーフな言語を使う利点、つまり実装詳細を低レベルで制御できることを、まったく別の安全な言語との統合に伴う問題の大半なしに得られることです。
 
-There are still some problems — most notably, we must become aware of properties
-that the type system assumes and audit them in any code that interacts with
-Unsafe Rust. That's the purpose of this book: to teach you about these assumptions
-and how to manage them.
+それでも問題は残ります。特に、型システムが仮定している性質を把握し、アンセーフな Rust とやり取りするコードでそれらを監査しなければなりません。この本の目的は、そうした仮定と、それらをどう管理するかを説明することです。

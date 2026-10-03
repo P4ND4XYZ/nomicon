@@ -1,117 +1,55 @@
-# How Safe and Unsafe Interact
+# 安全な Rust とアンセーフな Rust の相互作用
 
-What's the relationship between Safe Rust and Unsafe Rust? How do they
-interact?
+安全な Rust とアンセーフな Rust には、どのような関係があるのでしょうか。両者はどのように相互作用するのでしょうか。
 
-The separation between Safe Rust and Unsafe Rust is controlled with the
-`unsafe` keyword, which acts as an interface from one to the other. This is
-why we can say Safe Rust is a safe language: all the unsafe parts are kept
-exclusively behind the `unsafe` boundary. If you wish, you can even toss
-`#![forbid(unsafe_code)]` into your code base to statically guarantee that
-you're only writing Safe Rust.
+安全な Rust とアンセーフな Rust の分離は、一方から他方へのインターフェースとして機能する `unsafe` キーワードによって制御されます。このため、安全な Rust は安全な言語だと言えます。アンセーフな部分はすべて `unsafe` の境界の内側に閉じ込められているからです。望むなら、コードベースに `#![forbid(unsafe_code)]` を加えて、安全な Rust だけを書いていることを静的に保証することもできます。
 
-The `unsafe` keyword has two uses: to declare the existence of contracts the
-compiler can't check, and to declare that a programmer has checked that these
-contracts have been upheld.
+`unsafe` キーワードには2つの用途があります。コンパイラが検査できない契約の存在を宣言することと、プログラマがその契約を守っていることを確認したと宣言することです。
 
-You can use `unsafe` to indicate the existence of unchecked contracts on
-_functions_ and _trait declarations_. On functions, `unsafe` means that
-users of the function must check that function's documentation to ensure
-they are using it in a way that maintains the contracts the function
-requires. On trait declarations, `unsafe` means that implementors of the
-trait must check the trait documentation to ensure their implementation
-maintains the contracts the trait requires.
+`unsafe` は、_関数_ と _トレイト宣言_ に未検査の契約が存在することを示すために使えます。関数に `unsafe` が付いている場合、その関数の利用者は、関数が要求する契約を保てる形で使っていることを確かめるため、関数のドキュメントを確認しなければなりません。トレイト宣言に `unsafe` が付いている場合、そのトレイトの実装者は、自分の実装がトレイトの要求する契約を保っていることを確かめるため、トレイトのドキュメントを確認しなければなりません。
 
-You can use `unsafe` on a block to declare that all unsafe actions performed
-within are verified to uphold the contracts of those operations. For instance,
-the index passed to [`slice::get_unchecked`][get_unchecked] is in-bounds.
+ブロックに `unsafe` を付けると、その中で行うすべてのアンセーフな操作について、操作が要求する契約を守っていることを確認済みだと宣言できます。たとえば、[`slice::get_unchecked`][get_unchecked] に渡すインデックスが範囲内であることを確認した場合です。
 
-You can use `unsafe` on a trait implementation to declare that the implementation
-upholds the trait's contract. For instance, that a type implementing [`Send`] is
-really safe to move to another thread.
+トレイトの実装に `unsafe` を付けると、その実装がトレイトの契約を守っていると宣言できます。たとえば、[`Send`] を実装する型が、実際に別のスレッドへ安全にムーブできることを示します。
 
-The standard library has a number of unsafe functions, including:
+標準ライブラリには、次のようなアンセーフ関数があります。
 
-* [`slice::get_unchecked`][get_unchecked], which performs unchecked indexing,
-  allowing memory safety to be freely violated.
-* [`mem::transmute`][transmute] reinterprets some value as having a given type,
-  bypassing type safety in arbitrary ways (see [conversions] for details).
-* Every raw pointer to a sized type has an [`offset`][ptr_offset] method that
-  invokes Undefined Behavior if the passed offset is not ["in bounds"][ptr_offset].
-* All FFI (Foreign Function Interface) functions are `unsafe` to call because the
-  other language can do arbitrary operations that the Rust compiler can't check.
+* [`slice::get_unchecked`][get_unchecked] は、境界検査を行わずにインデックス参照します。メモリ安全性を自由に破れる操作です。
+* [`mem::transmute`][transmute] は、ある値を指定した型の値であるかのように再解釈し、任意の形で型安全性を迂回します（詳しくは[型変換][conversions]を参照してください）。
+* サイズのある型を指すすべての生ポインタには [`offset`][ptr_offset] メソッドがあり、渡したオフセットが「範囲内」[ptr_offset]でなければ未定義動作を引き起こします。
+* すべての FFI（Foreign Function Interface）関数は、呼び出すのが `unsafe` です。他の言語は、Rust コンパイラが検査できない任意の操作を実行できるからです。
 
-As of Rust 1.29.2, the standard library defines the following unsafe traits
-(there are others, but they are not stabilized yet and some of them may never
-be):
+Rust 1.29.2 時点で、標準ライブラリは次のアンセーフトレイトを定義しています（ほかにもありますが、まだ安定化されておらず、一部は今後も安定化されない可能性があります）。
 
-* [`Send`] is a marker trait (a trait with no API) that promises implementors
-  are safe to send (move) to another thread.
-* [`Sync`] is a marker trait that promises threads can safely share implementors
-  through a shared reference.
-* [`GlobalAlloc`] allows customizing the memory allocator of the whole program.
+* [`Send`] は API を持たないマーカートレイトです。これを実装する型は、別のスレッドへ安全に送信（ムーブ）できることを保証します。
+* [`Sync`] はマーカートレイトです。これを実装する型は、共有参照を介してスレッド間で安全に共有できることを保証します。
+* [`GlobalAlloc`] は、プログラム全体のメモリアロケータをカスタマイズできるようにします。
 
-Much of the Rust standard library also uses Unsafe Rust internally. These
-implementations have generally been rigorously manually checked, so the Safe Rust
-interfaces built on top of these implementations can be assumed to be safe.
+Rust の標準ライブラリの多くは、内部でアンセーフな Rust も使っています。こうした実装は一般に、手作業で厳密に検査されています。その上に構築された安全な Rust のインターフェースは、安全だと仮定できます。
 
-The need for all of this separation boils down to a single fundamental property
-of Safe Rust, the *soundness property*:
+この分離が必要な理由は、安全な Rust のただ1つの基本的な性質、*健全性*に集約されます。
 
-**No matter what, Safe Rust clients can't cause Undefined Behavior.**
+**何があっても、安全な Rust のクライアントは未定義動作を引き起こせません。**
 
-The design of the safe/unsafe split means that there is an asymmetric trust
-relationship between Safe and Unsafe Rust. Safe Rust inherently has to
-trust that any Unsafe Rust it touches has been written correctly.
-On the other hand, Unsafe Rust cannot trust Safe Rust without care. It can
-trust Safe Rust it is a client of, but it cannot trust Safe Rust chosen or
-supplied by its clients.
+安全／アンセーフの分離の設計は、非対称な信頼関係を生みます。安全な Rust は、自分が触れるあらゆるアンセーフな Rust が正しく書かれていることを、本質的に信頼しなければなりません。一方、アンセーフな Rust は、注意なしに安全な Rust を信頼することはできません。アンセーフな Rust は、自らが利用者となっている安全な Rust（依存先）なら信頼できますが、自らの利用者が選択または提供する安全な Rust まで信頼することはできません。
 
-As an example, Rust has the [`PartialOrd`] and [`Ord`] traits to differentiate
-between types which can "just" be compared, and those that provide a "total"
-ordering (which basically means that comparison behaves reasonably).
+例として、Rust には[`PartialOrd`] と [`Ord`] というトレイトがあり、「単に」比較できる型と、「全」順序を提供する型を区別します（全順序とは、基本的には比較が妥当に振る舞うということです）。
 
-[`BTreeMap`] doesn't really make sense for partially-ordered types, and so it
-requires that its keys implement `Ord`. However, `BTreeMap` has Unsafe Rust code
-inside of its implementation. Because it would be unacceptable for a sloppy `Ord`
-implementation (which is Safe to write) to cause Undefined Behavior, the Unsafe
-code in BTreeMap must be written to be robust against `Ord` implementations which
-aren't actually total — even though that's the whole point of requiring `Ord`.
+`BTreeMap` は半順序の型にはあまり意味がないため、キーに `Ord` の実装を要求します。しかし `BTreeMap` の実装にはアンセーフな Rust のコードが含まれています。安全に書ける `Ord` の実装の不備が未定義動作を引き起こすのは許容できません。そのため、`BTreeMap` 内のアンセーフなコードは、`Ord` を要求する本来の目的が全順序の提供であっても、全順序を実際には提供しない `Ord` の実装に対して堅牢でなければなりません。
 
-The Unsafe Rust code just can't trust the Safe Rust code to be written correctly.
-That said, `BTreeMap` will still behave completely erratically if you feed in
-values that don't have a total ordering. It just won't ever cause Undefined
-Behavior.
+アンセーフな Rust のコードは、安全な Rust のコードが正しく書かれていると信頼することはできません。とはいえ、全順序を持たない値を `BTreeMap` に渡すと、`BTreeMap` の動作は依然として完全にでたらめになります。ただし、未定義動作を引き起こすことはありません。
 
-One may wonder, if `BTreeMap` cannot trust `Ord` because it's Safe, why can it
-trust *any* Safe code? For instance `BTreeMap` relies on integers and slices to
-be implemented correctly. Those are safe too, right?
+`BTreeMap` が安全な `Ord` を信頼できないのなら、なぜほかの安全なコードは信頼できるのか、と疑問に思うかもしれません。たとえば、`BTreeMap` は整数やスライスが正しく実装されていることを前提としています。これらも安全なコードですよね。
 
-The difference is one of scope. When `BTreeMap` relies on integers and slices,
-it's relying on one very specific implementation. This is a measured risk that
-can be weighed against the benefit. In this case there's basically zero risk;
-if integers and slices are broken, *everyone* is broken. Also, they're maintained
-by the same people who maintain `BTreeMap`, so it's easy to keep tabs on them.
+違いは、信頼する範囲にあります。`BTreeMap` が整数やスライスに依存するとき、依存先は非常に具体的な1つの実装です。これは利益と比較衡量できるリスクです。この場合、リスクは事実上ゼロです。整数やスライスが壊れていたら、誰もが困るからです。また、それらは `BTreeMap` と同じ人々が保守しているため、状況を追いやすいのです。
 
-The same can be true across crate boundaries. Say crate `foo` depends on crate
-`bar`, then Unsafe Rust in crate `foo` may trust Safe Rust in crate `bar`. This
-is because crate `foo` chose to depend on crate `bar`, and by doing so trusted
-crate `bar` to be implemented correctly.
+クレートの境界をまたぐ場合も同じです。たとえば、クレート `foo` がクレート `bar` に依存しているとします。その場合、`foo` のアンセーフな Rust は、`bar` の安全な Rust を信頼できます。`foo` は `bar` に依存することを自ら選び、その選択によって `bar` が正しく実装されていると信頼したからです。
 
-On the other hand, `BTreeMap`'s key type is generic. Trusting its `Ord`
-implementation means trusting the `Ord` implementation of arbitrary clients.
-Here the risk is high: someone somewhere is going to make a mistake and mess up
-their `Ord` implementation, or even just straight up lie about providing a total
-ordering because "it seems to work". When that happens, `BTreeMap` needs to be
-prepared.
+一方、`BTreeMap` のキー型はジェネリックです。その `Ord` の実装を信頼することは、不特定多数の利用者による `Ord` の実装を信頼することです。ここではリスクが高くなります。誰かがどこかで `Ord` の実装を間違えるか、「動いているように見える」からという理由で、全順序を提供していると単に嘘をつくことになるでしょう。そうなった場合にも備えて、`BTreeMap` はおかなければなりません。
 
-The same logic applies to trusting a closure that's passed to you to behave
-correctly.
+渡されたクロージャが正しく振る舞うと信頼する場合にも、同じ理屈が当てはまります。
 
-This problem of unbounded generic trust is the problem that `unsafe` traits
-exist to resolve. The `BTreeMap` type could theoretically require that keys
-implement a new trait called `UnsafeOrd`, rather than `Ord`, that might look
-like this:
+この、ジェネリックな信頼を無制限に広げる問題を解決するために、`unsafe` トレイトがあります。理論上、`BTreeMap` はキーに `Ord` ではなく、たとえば次のような `UnsafeOrd` という新しいトレイトの実装を要求できます。
 
 ```rust
 use std::cmp::Ordering;
@@ -121,45 +59,17 @@ unsafe trait UnsafeOrd {
 }
 ```
 
-Then, a type would use `unsafe` to implement `UnsafeOrd`, indicating that
-they've ensured their implementation maintains whatever contracts the
-trait expects. In this situation, the Unsafe Rust in the internals of
-`BTreeMap` would be justified in trusting that the key type's `UnsafeOrd`
-implementation is correct. If it isn't, it's the fault of the unsafe trait
-implementation, which is consistent with Rust's safety guarantees.
+この場合、型の実装者は `unsafe` を使って `UnsafeOrd` を実装し、その実装がトレイトの要求する契約を保っていると確認したことを示します。そうすれば、`BTreeMap` 内部のアンセーフな Rust は、キー型の `UnsafeOrd` 実装が正しいと信頼できます。正しくなければ、それは `unsafe` トレイトの実装側の責任です。これは Rust の安全性保証と整合しています。
 
-The decision of whether to mark a trait `unsafe` is an API design choice. A
-safe trait is easier to implement, but any unsafe code that relies on it must
-defend against incorrect behavior. Marking a trait `unsafe` shifts this
-responsibility to the implementor. Rust has traditionally avoided marking
-traits `unsafe` because it makes Unsafe Rust pervasive, which isn't desirable.
+トレイトに `unsafe` を付けるかどうかは、API 設計上の選択です。安全なトレイトは実装しやすい一方、それに依存するアンセーフなコードは誤った動作から身を守らなければなりません。トレイトを `unsafe` にすると、この責任を実装者に移せます。Rust は従来、トレイトを `unsafe` にすることを避けてきました。アンセーフな Rust が広く行き渡ることになり、望ましくないからです。
 
-`Send` and `Sync` are marked unsafe because thread safety is a *fundamental
-property* that unsafe code can't possibly hope to defend against in the way it
-could defend against a buggy `Ord` implementation. Similarly, `GlobalAlloc`
-is keeping accounts of all the memory in the program and other things like
-`Box` or `Vec` that build on top of it. If it does something weird (giving the same
-chunk of memory to another request when it is still in use), there's no chance
-to detect that and do anything about it.
+`Send` と `Sync` が `unsafe` なのは、スレッド安全性が*根本的な性質*だからです。誤った `Ord` の実装から守るような方法で、アンセーフなコードがスレッド安全性を守ることは到底できません。同様に、`GlobalAlloc` はプログラム内のすべてのメモリや、それを基盤として使う `Box` や `Vec` などの管理を担います。使用中のメモリ領域を別の要求にも渡すなど、アロケータが奇妙な動作をした場合、それを検出して対処する方法はありません。
 
-The decision of whether to mark your own traits `unsafe` depends on the same
-sort of consideration. If `unsafe` code can't reasonably expect to defend
-against a broken implementation of the trait, then marking the trait `unsafe` is
-a reasonable choice.
+自分のトレイトを `unsafe` にするかどうかも、同じ観点で判断します。アンセーフなコードがトレイトの誤った実装から合理的に身を守れないのであれば、そのトレイトを `unsafe` にするのは妥当な選択です。
 
-As an aside, while `Send` and `Sync` are `unsafe` traits, they are *also*
-automatically implemented for types when such derivations are provably safe
-to do. `Send` is automatically derived for all types composed only of values
-whose types also implement `Send`. `Sync` is automatically derived for all
-types composed only of values whose types also implement `Sync`. This minimizes
-the pervasive unsafety of making these two traits `unsafe`. And not many people
-are going to *implement* memory allocators (or use them directly, for that
-matter).
+余談ですが、`Send` と `Sync` は `unsafe` トレイトである一方、安全に導出できると証明可能な場合には、型に自動実装されます。`Send` は、`Send` を実装する型の値だけで構成されたすべての型に自動導出されます。`Sync` も同様に、`Sync` を実装する型の値だけで構成されたすべての型に自動導出されます。これにより、これら2つのトレイトを `unsafe` にすることでアンセーフさが広く行き渡るのを抑えています。また、メモリアロケータを自分で実装する人は多くありません（直接使う人も同様です）。
 
-This is the balance between Safe and Unsafe Rust. The separation is designed to
-make using Safe Rust as ergonomic as possible, but requires extra effort and
-care when writing Unsafe Rust. The rest of this book is largely a discussion
-of the sort of care that must be taken, and what contracts Unsafe Rust must uphold.
+これが、安全な Rust とアンセーフな Rust のバランスです。この分離は、安全な Rust をできるだけ扱いやすくする一方で、アンセーフな Rust を書くときには、より多くの努力と注意を求めます。この本の残りの大部分では、どのような注意が必要か、そしてアンセーフな Rust がどの契約を守らなければならないかを説明します。
 
 [`Send`]: ../std/marker/trait.Send.html
 [`Sync`]: ../std/marker/trait.Sync.html

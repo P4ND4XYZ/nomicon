@@ -1,45 +1,45 @@
-# The Rustonomicon
+# Rust 裏本
 
 <div class="warning">
 
-Warning:
-This book is incomplete.
-Documenting everything and rewriting outdated parts take a while.
-See the [issue tracker] to check what's missing/outdated, and if there are any mistakes or ideas that haven't been reported, feel free to open a new issue there.
+警告:
+この書籍は未完成です。
+すべてを記述し、古くなった部分を書き直すには時間がかかります。
+不足している点や古くなった点については[issue tracker]を確認してください。また、まだ報告されていない誤りやアイデアがあれば、気軽にそちらへ新しい Issue を登録してください。
 
 </div>
 
 [issue tracker]: https://github.com/rust-lang/nomicon/issues
 
-## The Dark Arts of Unsafe Rust
+## アンセーフ Rust の闇の技法
 
-> THE KNOWLEDGE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF UNLEASHING INDESCRIBABLE HORRORS THAT SHATTER YOUR PSYCHE AND SET YOUR MIND ADRIFT IN THE UNKNOWABLY INFINITE COSMOS.
+> 知識は「現状有姿」で提供され、明示・黙示を問わず、いかなる種類の保証もありません。あなたの精神を打ち砕いて未知なる無限の宇宙を漂流させる、言い表せない恐怖を解き放つことに関する保証も含まれますが、それに限りません。
 
-The Rustonomicon digs into all the awful details that you need to understand when writing Unsafe Rust programs.
+Rust 裏本は、アンセーフな Rust プログラムを書くときに理解しておく必要がある、おぞましい詳細に踏み込みます。
 
-Should you wish a long and happy career of writing Rust programs, you should turn back now and forget you ever saw this book.
-It is not necessary.
-However if you intend to write unsafe code — or just want to dig into the guts of the language — this book contains lots of useful information.
+Rust プログラムを書きながら長く幸せな職業人生を送りたいのであれば、今すぐ引き返し、この本を見たことを忘れてください。
+この本は必要ありません。
+しかし、アンセーフなコードを書くつもりがある場合、あるいは言語の内部を掘り下げたいだけの場合には、この本には多くの有用な情報があります。
 
-Unlike *[The Rust Programming Language][trpl]*, we will be assuming considerable prior knowledge.
-In particular, you should be comfortable with basic systems programming and Rust.
-If you don't feel comfortable with these topics, you should consider reading [The Book][trpl] first.
-That said, we won't assume you have read it, and we will take care to occasionally give a refresher on the basics where appropriate.
-You can skip straight to this book if you want; just know that we won't be explaining everything from the ground up.
+*[The Rust Programming Language][trpl]*とは異なり、本書ではかなりの事前知識を前提とします。
+特に、基本的なシステムプログラミングと Rust に慣れている必要があります。
+これらの分野に不安があるなら、まず[The Book][trpl]を読むことを検討してください。
+ただし、読了済みであることまでは前提としません。また、適切な箇所では基本事項を折に触れて復習できるようにします。
+この本から読み始めても構いませんが、すべてを基礎から説明するわけではないことを覚えておいてください。
 
-This book exists primarily as a high-level companion to [The Reference][ref].
-Where The Reference exists to detail the syntax and semantics of every part of the language, The Rustonomicon exists to describe how to use those pieces together, and the issues that you will have in doing so.
+この本は主に[The Reference][ref]を高い視点から補うものです。
+The Reference は言語のあらゆる部分の構文とセマンティクスを詳述するのに対し、Rust 裏本はそれらを組み合わせて使う方法と、その際に直面する問題を説明します。
 
-The Reference will tell you the syntax and semantics of references, destructors, and unwinding, but it won't tell you how combining them can lead to exception-safety issues, or how to deal with those issues.
+The Reference は参照、デストラクタ、巻き戻しの構文とセマンティクスを説明しますが、それらを組み合わせることでどのように例外安全性の問題が生じるか、またその問題にどう対処するかまでは説明しません。
 
-It should be noted that we haven't synced The Rustnomicon and The Reference well, so they may have duplicate content.
-In general, if the two documents disagree, The Reference should be assumed to be correct (it isn't yet considered normative, it's just better maintained).
+Rustnomicon と The Reference の同期は十分に取れていないため、内容が重複していることがあります。
+一般に、両文書の記述が食い違う場合は、The Reference の方が正しいものとして扱ってください（The Reference はまだ規範的な文書とは見なされていませんが、よりよく保守されています）。
 
-Topics that are within the scope of this book include: the meaning of (un)safety, unsafe primitives provided by the language and standard library, techniques for creating safe abstractions with those unsafe primitives, subtyping and variance, exception-safety (panic/unwind-safety), working with uninitialized memory, type punning, concurrency, interoperating with other languages (FFI), optimization tricks, how constructs lower to compiler/OS/hardware primitives, how to **not** make the memory model people angry, how you're **going** to make the memory model people angry, and more.
+本書の対象には、安全性／アンセーフ性の意味、言語と標準ライブラリが提供するアンセーフなプリミティブ、それらのプリミティブを使って安全な抽象化を作る技法、部分型と変性、例外安全性（パニック／巻き戻し安全性）、未初期化メモリの扱い、型パンニング（型の再解釈）、並行性、他言語との相互運用（FFI）、最適化の技法、構文要素がコンパイラ／OS／ハードウェアのプリミティブへどのように低レベル化されるか、メモリモデルに関わる人々を怒らせない方法、そしてどうすれば彼らを怒らせてしまうか、その他さまざまな話題が含まれます。
 
-The Rustonomicon is not a place to exhaustively describe the semantics and guarantees of every single API in the standard library, nor is it a place to exhaustively describe every feature of Rust.
+Rust 裏本は、標準ライブラリのすべての API のセマンティクスと保証を網羅的に説明する場所でも、Rust のすべての機能を網羅的に説明する場所でもありません。
 
-Unless otherwise noted, Rust code in this book uses the Rust 2024 edition.
+特に断りのない限り、本書の Rust コードは Rust 2024 edition を使用します。
 
 [trpl]: ../book/index.html
 [ref]: ../reference/index.html

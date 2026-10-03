@@ -1,10 +1,8 @@
-# Layout
+# レイアウト
 
-First off, we need to come up with the struct layout. A Vec has three parts:
-a pointer to the allocation, the size of the allocation, and the number of
-elements that have been initialized.
+まず、構造体のレイアウトを決める必要があります。`Vec` は、アロケーションへのポインタ、アロケーションのサイズ、初期化済みの要素数という 3 つの部分から成ります。
 
-Naively, this means we just want this design:
+単純に考えると、次の設計がよさそうです。
 
 <!-- ignore: simplified code -->
 ```rust,ignore
@@ -15,28 +13,18 @@ pub struct Vec<T> {
 }
 ```
 
-And indeed this would compile. Unfortunately, it would be too strict. The
-compiler will give us too strict variance. So a `&Vec<&'static str>`
-couldn't be used where a `&Vec<&'a str>` was expected. See [the chapter
-on ownership and lifetimes][ownership] for all the details on variance.
+実際、これはコンパイルできます。しかし、制約が厳しすぎます。コンパイラによって変性も厳しすぎるものになります。たとえば、`&Vec<&'static str>` は、`&Vec<&'a str>` が期待される場所では使えません。変性について詳しくは、[所有権とライフタイムの章][ownership]を参照してください。
 
-As we saw in the ownership chapter, the standard library uses `Unique<T>` in place of
-`*mut T` when it has a raw pointer to an allocation that it owns. Unique is unstable,
-so we'd like to not use it if possible, though.
+所有権の章で見たように、標準ライブラリは、自ら所有するアロケーションへの生ポインタを持つ場合、`*mut T` の代わりに `Unique<T>` を使います。ただし、`Unique` は不安定なので、可能なら使わずに済ませたいところです。
 
-As a recap, Unique is a wrapper around a raw pointer that declares that:
+要点を振り返ると、`Unique` は生ポインタを包むラッパで、次のことを宣言します。
 
-* We are covariant over `T`
-* We may own a value of type `T` (this is not relevant for our example here, but see 
-  [the chapter on PhantomData][phantom-data] on why the real `std::vec::Vec<T>` needs this)
-* We are Send/Sync if `T` is Send/Sync
-* Our pointer is never null (so `Option<Vec<T>>` is null-pointer-optimized)
+* `T` に対して共変である
+* 型 `T` の値を所有する可能性がある（ここでの例には関係ありませんが、実際の `std::vec::Vec<T>` がこれを必要とする理由は[PhantomData の章][phantom-data]を参照してください）
+* `T` が `Send`／`Sync` なら、自身もそれぞれ `Send`／`Sync` である
+* ポインタは決してヌルではない（そのため `Option<Vec<T>>` はヌルポインタ最適化される）
 
-We can implement all of the above requirements in stable Rust. To do this, instead
-of using `Unique<T>` we will use [`NonNull<T>`][NonNull], another wrapper around a
-raw pointer, which gives us two of the above properties, namely it is covariant
-over `T` and is declared to never be null. By implementing Send/Sync if `T` is,
-we get the same results as using `Unique<T>`:
+これらの要件は、安定版 Rust でもすべて実装できます。そのために、`Unique<T>` の代わりに、同じく生ポインタを包む別のラッパである [`NonNull<T>`][NonNull] を使います。`NonNull<T>` は、上記の性質のうち 2 つ、つまり `T` に対して共変であることと、ヌルではないと宣言されていることを備えています。`T` が `Send`／`Sync` なら `Send`／`Sync` を実装することで、`Unique<T>` を使った場合と同じ結果になります。
 
 ```rust
 use std::ptr::NonNull;

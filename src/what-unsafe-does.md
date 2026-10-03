@@ -1,93 +1,62 @@
-# What Unsafe Rust Can Do
+# アンセーフ Rust でできること
 
-The only things that are different in Unsafe Rust are that you can:
+アンセーフ Rust で異なるのは、次のことができる点だけです。
 
-* Dereference raw pointers
-* Call `unsafe` functions (including C functions, compiler intrinsics, and the raw allocator)
-* Implement `unsafe` traits
-* Access or modify mutable statics
-* Access fields of `union`s
+* 生ポインタを参照外しする
+* `unsafe` 関数（C 関数、コンパイラ intrinsic、生アロケータを含む）を呼び出す
+* `unsafe` トレイトを実装する
+* ミュータブル static にアクセスする、または変更する
+* `union` のフィールドにアクセスする
 
-That's it. The reason these operations are relegated to Unsafe is that misusing
-any of these things will cause the ever dreaded Undefined Behavior. Invoking
-Undefined Behavior gives the compiler full rights to do arbitrarily bad things
-to your program. You definitely *should not* invoke Undefined Behavior.
+以上です。これらの操作がアンセーフに分類されているのは、誤用すると恐ろしい未定義動作を引き起こすからです。未定義動作を起こすと、コンパイラはプログラムに対して任意の悪いことをする全権を得ます。未定義動作を起こしてはいけません。
 
-Unlike C, Undefined Behavior is pretty limited in scope in Rust. All the core
-language cares about is preventing the following things:
+C とは異なり、Rust における未定義動作の範囲はかなり限られています。コア言語が防ごうとするのは、次の事柄だけです。
 
-* Dereferencing (using the `*` operator on) dangling or unaligned pointers (see below)
-* Breaking the [pointer aliasing rules][]
-* Calling a function with the wrong call ABI or unwinding from a function with the wrong unwind ABI.
-* Causing a [data race][race]
-* Executing code compiled with [target features][] that the current thread of execution does
-  not support
-* Producing invalid values (either alone or as a field of a compound type such
-  as `enum`/`struct`/array/tuple):
-  * a `bool` that isn't 0 or 1
-  * an `enum` with an invalid discriminant
-  * a null `fn` pointer
-  * a `char` outside the ranges [0x0, 0xD7FF] and [0xE000, 0x10FFFF]
-  * a `!` (all values are invalid for this type)
-  * an integer (`i*`/`u*`), floating point value (`f*`), or raw pointer read from
-    [uninitialized memory][], or uninitialized memory in a `str`.
-  * a reference/`Box` that is dangling, unaligned, or points to an invalid value.
-  * a wide reference, `Box`, or raw pointer that has invalid metadata:
-    * `dyn Trait` metadata is invalid if it is not a pointer to a vtable for
-      `Trait` that matches the actual dynamic trait the pointer or reference points to
-    * slice metadata is invalid if the length is not a valid `usize`
-      (i.e., it must not be read from uninitialized memory)
-  * a type with custom invalid values that is one of those values, such as a
-    [`NonNull`] that is null. (Requesting custom invalid values is an unstable
-    feature, but some stable libstd types, like `NonNull`, make use of it.)
+* ダングリングまたはアラインメントを満たさないポインタに対して `*` 演算子を使って参照外しする（下記参照）
+* [ポインタのエイリアシング規則][]に違反する
+* 誤った呼び出し ABI を使って関数を呼び出す、または誤った unwind ABI を持つ関数から unwind する
+* [データ競合][race]を起こす
+* 現在の実行スレッドがサポートしていない [target feature][] でコンパイルされたコードを実行する
+* 無効な値を生成する（単独の値として、または `enum`／`struct`／配列／タプルなどの複合型のフィールドとして）。たとえば、次の値です。
+  * 0 または 1 ではない `bool`
+  * 無効な判別子を持つ `enum`
+  * ヌルの `fn` ポインタ
+  * 範囲 [0x0, 0xD7FF] および [0xE000, 0x10FFFF] の外にある `char`
+  * `!`（この型ではすべての値が無効です）
+  * [未初期化メモリ][]から読み取った整数（`i*`／`u*`）、浮動小数点値（`f*`）、または生ポインタ、あるいは `str` 内の未初期化メモリ
+  * ダングリングしている、アラインメントを満たさない、または無効な値を指す参照／`Box`
+  * 無効なメタデータを持つワイド参照、`Box`、または生ポインタ。具体的には次のとおりです。
+    * `dyn Trait` のメタデータは、そのポインタまたは参照が指す実際の動的トレイトに対応する `Trait` の vtable へのポインタでなければ有効ではありません
+    * スライスメタデータは、長さが有効な `usize` でなければ有効ではありません（つまり、未初期化メモリから読み取ってはなりません）
+  * [`NonNull`] がヌルである場合のように、カスタムの無効値を持つ型がその無効値になっていること（カスタムの無効値を要求する機能は不安定ですが、`NonNull` など一部の安定版 libstd 型がこれを利用しています）
 
-For a more detailed explanation about "Undefined Behavior", you may refer to
-[the reference][behavior-considered-undefined].
+「未定義動作」について詳しくは、[Reference][behavior-considered-undefined]を参照してください。
 
-"Producing" a value happens any time a value is assigned, passed to a
-function/primitive operation or returned from a function/primitive operation.
+値の「生成」は、値が代入されるとき、関数／プリミティブ操作に渡されるとき、または関数／プリミティブ操作から返されるときに発生します。
 
-A reference/pointer is "dangling" if it is null or not all of the bytes it
-points to are part of the same allocation (so in particular they all have to be
-part of *some* allocation). The span of bytes it points to is determined by the
-pointer value and the size of the pointee type. As a consequence, if the span is
-empty, "dangling" is the same as "null". Note that slices and strings point
-to their entire range, so it's important that the length metadata is never too
-large (in particular, allocations and therefore slices and strings cannot be
-bigger than `isize::MAX` bytes). If for some reason this is too cumbersome,
-consider using raw pointers.
+参照／ポインタが「ダングリング」しているとは、ヌルであるか、指すバイトのすべてが同一のアロケーションに属しているわけではないことを指します（つまり、特に、指すバイトはすべて何らかのアロケーションに属していなければなりません）。指すバイト範囲は、ポインタ値と指示先の型のサイズによって決まります。その結果、範囲が空なら、「ダングリング」は「ヌル」と同じ意味になります。スライスと文字列は範囲全体を指すため、長さのメタデータが大きくなりすぎないことが重要です（特に、アロケーション、したがってスライスと文字列は `isize::MAX` バイトを超える大きさにはできません）。これが何らかの理由で扱いにくすぎる場合は、生ポインタの使用を検討してください。
 
-That's it. That's all the causes of Undefined Behavior baked into Rust. Of
-course, unsafe functions and traits are free to declare arbitrary other
-constraints that a program must maintain to avoid Undefined Behavior. For
-instance, the allocator APIs declare that deallocating unallocated memory is
-Undefined Behavior.
+以上が、Rust に組み込まれている未定義動作の原因のすべてです。もちろん、アンセーフ関数やトレイトは、未定義動作を避けるためにプログラムが守るべき任意の制約を宣言できます。たとえば、アロケータ API では、アロケートされていないメモリをデアロケートすることは未定義動作だと定めています。
 
-However, violations of these constraints generally will just transitively lead to one of
-the above problems. Some additional constraints may also derive from compiler
-intrinsics that make special assumptions about how code can be optimized. For instance,
-Vec and Box make use of intrinsics that require their pointers to be non-null at all times.
+ただし、こうした制約への違反は、一般に上記の問題のいずれかへ間接的につながります。コードの最適化方法についてコンパイラが特別な仮定を置く compiler intrinsic に由来して、追加の制約が生じることもあります。たとえば `Vec` と `Box` は、ポインタが常に非ヌルであることを要求する intrinsic を利用しています。
 
-Rust is otherwise quite permissive with respect to other dubious operations.
-Rust considers it "safe" to:
+それ以外の疑わしい操作については、Rust はかなり寛容です。Rust では、次のことは「安全」だと見なされます。
 
-* Deadlock
-* Have a [race condition][race]
-* Leak memory
-* Overflow integers (with the built-in operators such as `+` etc.)
-* Abort the program
-* Delete the production database
+* デッドロックする
+* [競合状態][race]になる
+* メモリをリークする
+* 組み込み演算子（`+` など）で整数をオーバーフローさせる
+* プログラムをアボートする
+* 本番データベースを削除する
 
-For more detailed information, you may refer to [the reference][behavior-not-considered-unsafe].
+詳しくは、[Reference][behavior-not-considered-unsafe]を参照してください。
 
-However any program that actually manages to do such a thing is *probably*
-incorrect. Rust provides lots of tools to make these things rare, but
-these problems are considered impractical to categorically prevent.
+しかし、実際にこのようなことをしてしまうプログラムは、おそらく誤っています。Rust にはこうした事態をまれにするための道具が数多くありますが、これらの問題を一律に防ぐのは現実的でないと考えられています。
 
-[pointer aliasing rules]: references.html
-[uninitialized memory]: uninitialized.html
+[ポインタのエイリアシング規則]: references.html
+[未初期化メモリ]: uninitialized.html
 [race]: races.html
-[target features]: ../reference/attributes/codegen.html#the-target_feature-attribute
+[target feature]: ../reference/attributes/codegen.html#the-target_feature-attribute
 [`NonNull`]: ../std/ptr/struct.NonNull.html
 [behavior-considered-undefined]: ../reference/behavior-considered-undefined.html
 [behavior-not-considered-unsafe]: ../reference/behavior-not-considered-unsafe.html
